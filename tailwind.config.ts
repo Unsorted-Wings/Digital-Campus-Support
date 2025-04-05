@@ -63,6 +63,7 @@ const config: Config = {
 			scalePulse: "scalePulse 4s ease-in-out infinite",
 			float: "float 6s ease-in-out infinite",
 			floatAlt: "floatAlt 5s ease-in-out infinite",
+			wave: "wave 8s ease-in-out infinite",
 		  },
 		  keyframes: {
 			slideUp: {
@@ -89,6 +90,10 @@ const config: Config = {
 			  "0%, 100%": { transform: "translateX(0)" },
 			  "50%": { transform: "translateX(10px)" },
 			},
+			wave: {
+				"0%, 100%": { d: "M0,160 C320,300,640,100,960,200 C1280,300,1440,160,1440,160 L1440,320 L0,320 Z" },
+				"50%": { d: "M0,160 C320,100,640,300,960,160 C1280,100,1440,200,1440,200 L1440,320 L0,320 Z" },
+			  },
 		  },
   	}
   },
