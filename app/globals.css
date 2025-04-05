@@ -2,26 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%; /* White for light mode */
+    --foreground: 270 70% 40%; /* Purple text */
+    --card: 0 0% 100%;
+    --card-foreground: 270 70% 40%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 270 70% 40%;
+    --primary: 270 80% 60%; /* Bright purple */
+    --primary-foreground: 120 60% 95%; /* Light green for contrast */
+    --secondary: 120 40% 90%; /* Soft green */
+    --secondary-foreground: 270 70% 40%;
+    --muted: 120 40% 90%;
+    --muted-foreground: 270 20% 60%;
+    --accent: 120 40% 90%;
+    --accent-foreground: 270 70% 40%;
+    --destructive: 0 84.2% 60.2%; /* Keep red for destructive */
+    --destructive-foreground: 210 40% 98%;
+    --border: 270 30% 85%;
+    --input: 270 30% 85%;
+    --ring: 270 80% 60%;
+    --chart-1: 270 70% 50%; /* Purple chart */
+    --chart-2: 120 60% 45%; /* Green chart */
+    --chart-3: 270 50% 30%;
+    --chart-4: 120 70% 55%;
+    --chart-5: 270 80% 70%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 270 50% 10%; /* Dark purple background */
+    --foreground: 120 60% 95%; /* Light green text */
+    --card: 270 50% 15%; /* Slightly lighter purple */
+    --card-foreground: 120 60% 95%;
+    --popover: 270 50% 15%;
+    --popover-foreground: 120 60% 95%;
+    --primary: 270 80% 60%; /* Bright purple */
+    --primary-foreground: 120 60% 95%; /* Light green */
+    --secondary: 120 40% 20%; /* Darker green */
+    --secondary-foreground: 270 80% 60%;
+    --muted: 120 40% 20%;
+    --muted-foreground: 270 20% 70%;
+    --accent: 120 40% 20%;
+    --accent-foreground: 270 80% 60%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 120 60% 95%;
+    --border: 270 30% 25%;
+    --input: 270 30% 25%;
+    --ring: 270 80% 60%;
+    --chart-1: 270 70% 50%;
+    --chart-2: 120 60% 45%;
+    --chart-3: 270 50% 30%;
+    --chart-4: 120 70% 55%;
+    --chart-5: 270 80% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }
