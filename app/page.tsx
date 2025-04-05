@@ -66,7 +66,7 @@ export default function HomePage() {
               className={cn(
                 "group relative overflow-hidden bg-card/95 backdrop-blur-md border-border",
                 "transition-all duration-500 hover:shadow-xl hover:shadow-primary/20",
-                "opacity-0 translate-y-10 animate-[fadeUp_0.6s_ease-out_forwards] z-[10]"
+                "opacity-0 translate-y-10 animate-[fadeInUp_0.6s_ease-out_forwards] z-[10]"
               )}
               style={{ animationDelay: `${index * 0.15}s` }}
             >

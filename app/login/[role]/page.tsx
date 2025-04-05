@@ -6,16 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModeToggle } from "@/components/ThemeToggle";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export default function RoleLoginPage({ params }: { params: { role: string } }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const router = useRouter();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Add your login logic here (e.g., API call)
     console.log(`Logging in as ${params.role}:`, { email, password });
+    // Example: redirect to dashboard or show success message
+    router.push(`/${params.role}/home`);
   };
 
   const role = params.role.charAt(0).toUpperCase() + params.role.slice(1);
