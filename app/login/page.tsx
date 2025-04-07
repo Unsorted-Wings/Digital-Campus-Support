@@ -67,7 +67,7 @@ export default function LoginPage() {
                         "h-5 w-5 text-primary transform group-hover:translate-x-2 transition-transform duration-300 ease-out"
                       )}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-r from-primary/0 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   </CardContent>
                 </Card>
               </Link>
