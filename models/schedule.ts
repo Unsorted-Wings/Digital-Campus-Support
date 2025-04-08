@@ -1,5 +1,6 @@
 export interface CalendarEvent {
     id: string;              // Unique identifier (same as Firestore doc ID)
+    userId: string;         // UID of the user (Firebase Auth UID)
     title: string;           // Event title
     description?: string;    // Optional event details
     start: string;           // ISO date-time format (e.g., "2025-04-01T09:00:00")

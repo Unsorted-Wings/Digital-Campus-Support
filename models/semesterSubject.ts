@@ -1,6 +1,6 @@
 export type SemesterSubjects = {
     id: string;
-    semesterId: string;
+    semesterDetailId: string;
     subjectId: string;
     teacherId: string;
     createdAt: string;

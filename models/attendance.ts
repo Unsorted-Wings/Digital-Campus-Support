@@ -4,7 +4,8 @@ export type Attendance = {
     batchId: string;
     semesterId: string;
     studentId: string;
-    percentage: number;
+    averagePercentage: number;
+    subjects: { subjectId: string; attendacePercentage: number }[]
     createdAt: string;
     updatedAt: string;
 };
