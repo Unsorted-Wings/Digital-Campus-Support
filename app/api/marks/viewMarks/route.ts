@@ -29,16 +29,26 @@ export async function GET(req: NextRequest) {
 
     const decodedToken = await admin.auth().verifyIdToken(token);
     if (decodedToken.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: Only admins can view marks" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Only admins can view marks" },
+        { status: 403 }
+      );
     }
 
     // 2️⃣ Optionally filter by studentId (query param)
     const { searchParams } = new URL(req.url);
     const studentId = searchParams.get("studentId");
+    const examId = searchParams.get("examId");
 
-    let marksQuery: FirebaseFirestore.Query = admin.firestore().collection("marks");
+    let marksQuery: FirebaseFirestore.Query = admin
+      .firestore()
+      .collection("marks");
     if (studentId) {
       marksQuery = marksQuery.where("studentId", "==", studentId);
+    }
+
+    if (examId) {
+      marksQuery = marksQuery.where("examId", "==", examId);
     }
 
     const snapshot = await marksQuery.get();

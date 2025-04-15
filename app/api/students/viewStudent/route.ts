@@ -67,6 +67,8 @@ export async function GET(req: NextRequest) {
           id: studentData.id,
           rollNumber: studentData.rollNumber,
           course: studentData.course,
+          description: studentData.description || "",
+          isAlumni: studentData.isAlumni ?? false,
           createdAt: studentData.createdAt,
           updatedAt: studentData.updatedAt,
         },

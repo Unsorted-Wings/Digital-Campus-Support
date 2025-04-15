@@ -28,7 +28,8 @@ export async function PUT(req: NextRequest) {
     }
 
     // 3️⃣ Parse Request Body
-    const { uid, email, name, role, profilePicture, rollNumber, course } = await req.json();
+    const { uid, email, name, role, profilePicture, rollNumber, course, description, isAlumni } = await req.json();
+
 
     // 4️⃣ Validate Input Fields
     if (!uid || !email || !name || !rollNumber || !course || !role) {
@@ -55,9 +56,13 @@ export async function PUT(req: NextRequest) {
     await admin.firestore().collection("users").doc(uid).update(updatedUserData);
 
     // 7️⃣ Update Student Record
+    const existingStudent = studentDoc.data();
+
     const updatedStudentData = {
       rollNumber,
       course,
+      description: description ?? existingStudent?.description ?? "",
+      isAlumni: isAlumni ?? existingStudent?.isAlumni ?? false,
       updatedAt: new Date().toISOString(),
     };
 

@@ -4,6 +4,7 @@ export type Exam = {
     courseId:string;
     batchId:string;
     semesterId: string;
+    marks:string[];
     scheduleUrl : string;
     createdAt: string;
     updatedAt: string;

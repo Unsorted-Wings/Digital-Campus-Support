@@ -29,10 +29,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 3️⃣ Parse Request Body
-    const { email, password, name, rollNumber, course } = await req.json();
-    if (!email || !password || !name || !rollNumber || !course) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
+    const { email, password, name, rollNumber, course, description, isAlumni } = await req.json();
+
+if (!email || !password || !name || !rollNumber || !course) {
+  return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+}
 
     // 4️⃣ Hash the Password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     // 5️⃣ Create Firebase Auth User (for the student)
     const userRecord = await admin.auth().createUser({
       email,
-      password, // This password is only used for Firebase Auth
+      password:hashedPassword, // This password is only used for Firebase Auth
       displayName: name,
     });
 
@@ -50,6 +51,8 @@ export async function POST(req: NextRequest) {
       id: studentId,
       rollNumber,
       course,
+      description: description || "",
+      isAlumni: isAlumni ?? false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

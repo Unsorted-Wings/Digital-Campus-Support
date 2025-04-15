@@ -33,7 +33,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // 2️⃣ Parse Request Body
-    const { id, name, courseId, batchId, semesterId, scheduleUrl } = await req.json();
+    const { id, name, courseId, batchId, semesterId, scheduleUrl, marks } = await req.json();
 
     if (!id) {
       return NextResponse.json({ error: "Missing exam ID" }, { status: 400 });
@@ -56,6 +56,7 @@ export async function PUT(req: NextRequest) {
     if (batchId) updatedData.batchId = batchId;
     if (semesterId) updatedData.semesterId = semesterId;
     if (scheduleUrl) updatedData.scheduleUrl = scheduleUrl;
+    if (marks && Array.isArray(marks)) updatedData.marks = marks;
 
     await examRef.update(updatedData);
 

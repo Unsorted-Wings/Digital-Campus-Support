@@ -5,7 +5,7 @@ export type Attendance = {
     semesterId: string;
     studentId: string;
     averagePercentage: number;
-    subjects: { subjectId: string; attendacePercentage: number }[]
+    subjects: { subjectId: string; attendancePercentage: number }[]
     createdAt: string;
     updatedAt: string;
 };

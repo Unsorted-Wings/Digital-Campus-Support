@@ -29,21 +29,28 @@ export async function POST(req: NextRequest) {
 
     const decodedToken = await admin.auth().verifyIdToken(token);
     if (decodedToken.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: Only admins can create marks" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Only admins can create marks" },
+        { status: 403 }
+      );
     }
 
     // 2️⃣ Parse Request Body
-    const { studentId, subjects } = await req.json();
+    const { studentId, examId, subjects } = await req.json();
 
-    if (!studentId || !subjects || !Array.isArray(subjects)) {
-      return NextResponse.json({ error: "Missing or invalid required fields" }, { status: 400 });
+    if (!studentId || !examId || !subjects || !Array.isArray(subjects)) {
+      return NextResponse.json(
+        { error: "Missing or invalid required fields" },
+        { status: 400 }
+      );
     }
 
     // 3️⃣ Create Marks Document
     const now = new Date().toISOString();
     const marksDoc = {
       studentId,
-      subjects, // array of { subjectId, marks }
+      examId,
+      subjects,
       createdAt: now,
       updatedAt: now,
     };

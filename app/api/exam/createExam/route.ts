@@ -17,23 +17,38 @@ export async function POST(req: NextRequest) {
   try {
     // 1️⃣ Authorization Check
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!authHeader)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const token = authHeader.split("Bearer ")[1];
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!token)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const decodedToken = await admin.auth().verifyIdToken(token);
     if (decodedToken.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: Only admins can create exams" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Only admins can create exams" },
+        { status: 403 }
+      );
     }
 
     // 2️⃣ Parse Request Body
-    const { name, courseId, batchId, semesterId, scheduleUrl } = await req.json();
+    const { name, courseId, batchId, semesterId, scheduleUrl, marks } =
+      await req.json();
 
-    if (!name || !courseId || !batchId || !semesterId || !scheduleUrl) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (
+      !name ||
+      !courseId ||
+      !batchId ||
+      !semesterId ||
+      !scheduleUrl ||
+      !Array.isArray(marks)
+    ) {
+      return NextResponse.json(
+        { error: "Missing or invalid required fields" },
+        { status: 400 }
+      );
     }
-
     // 3️⃣ Prepare Data
     const now = new Date().toISOString();
     const examRef = admin.firestore().collection("exams").doc();
@@ -46,6 +61,7 @@ export async function POST(req: NextRequest) {
       batchId,
       semesterId,
       scheduleUrl,
+      marks,
       createdAt: now,
       updatedAt: now,
     };
@@ -53,7 +69,10 @@ export async function POST(req: NextRequest) {
     // 4️⃣ Save to Firestore
     await examRef.set(examData);
 
-    return NextResponse.json({ message: "Exam created successfully", exam: examData }, { status: 201 });
+    return NextResponse.json(
+      { message: "Exam created successfully", exam: examData },
+      { status: 201 }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
