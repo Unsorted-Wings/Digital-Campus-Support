@@ -1,32 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { firestore } from "@/lib/firebase/firebaseAdmin"; 
+import { getToken } from "next-auth/jwt";
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1️⃣ Authenticate via NextAuth
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    const token = authHeader.split("Bearer ")[1];
-    const decoded = await admin.auth().verifyIdToken(token);
-    if (decoded.role !== "admin") return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
+    if (token.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
+    }
+
+    // 2️⃣ Parse and validate body
     const { courseId, batchId, subjects, startDate, endDate, mentor } = await req.json();
 
     if (!courseId || !batchId || !startDate || !endDate || !mentor || !subjects) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    const semesterRef = admin.firestore().collection("semesterDetails").doc();
+    // 3️⃣ Create new semester document
+    const semesterRef = firestore.collection("semesterDetails").doc();
     const timestamp = new Date().toISOString();
 
     const semesterDetail = {
@@ -42,6 +39,8 @@ export async function POST(req: NextRequest) {
     };
 
     await semesterRef.set(semesterDetail);
+
+    // 4️⃣ Respond with success
     return NextResponse.json({ message: "Semester created", semesterDetail }, { status: 201 });
 
   } catch (err: any) {

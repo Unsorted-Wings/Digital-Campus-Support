@@ -1,29 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
+// app/api/faculty/update/route.ts
 
-// Initialize Firebase Admin SDK if it's not initialized yet
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt"; // Use NextAuth for token verification
+import { firestore } from "@/lib/firebase/firebaseAdmin"; // Assuming you're using Firebase Firestore
 
 export async function PUT(req: NextRequest) {
   try {
-    // 1️⃣ Check Authorization Header
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1️⃣ Check Admin Authorization with NextAuth JWT token
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    const token = authHeader.split("Bearer ")[1];
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    // 2️⃣ Verify Admin Token
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    if (decodedToken.role !== "admin") {
+    // 2️⃣ Check if the user has the 'admin' role
+    if (token.role !== "admin") {
       return NextResponse.json({ error: "Forbidden: Only admins can update faculty" }, { status: 403 });
     }
 
@@ -34,22 +25,22 @@ export async function PUT(req: NextRequest) {
     }
 
     // 4️⃣ Check if the faculty exists in 'users' and 'faculties'
-    const userDoc = await admin.firestore().collection("users").doc(facultyId).get();
-    const facultyDoc = await admin.firestore().collection("faculties").doc(facultyId).get();
+    const userDoc = await firestore.collection("users").doc(facultyId).get();
+    const facultyDoc = await firestore.collection("faculties").doc(facultyId).get();
 
     if (!userDoc.exists || !facultyDoc.exists) {
       return NextResponse.json({ error: "Faculty not found" }, { status: 404 });
     }
 
     // 5️⃣ Update User Data in 'users' Collection
-    await admin.firestore().collection("users").doc(facultyId).update({
+    await firestore.collection("users").doc(facultyId).update({
       email,
       name,
       updatedAt: new Date().toISOString(),
     });
 
     // 6️⃣ Update Faculty Data in 'faculties' Collection
-    await admin.firestore().collection("faculties").doc(facultyId).update({
+    await firestore.collection("faculties").doc(facultyId).update({
       qualification,
       isMentor,
       updatedAt: new Date().toISOString(),

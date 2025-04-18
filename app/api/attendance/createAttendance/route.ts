@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { getToken } from "next-auth/jwt"; 
+import { firestore } from "@/lib/firebase/firebaseAdmin"; 
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const token = authHeader.split("Bearer ")[1];
-    const decoded = await admin.auth().verifyIdToken(token);
-    if (decoded.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // 1️⃣ Authorization Check using NextAuth JWT Token
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { role } = token; // Assuming the role is included in the JWT token
+
+    // 2️⃣ Verify that only admins can create attendance
+    if (role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // 3️⃣ Parse request body
     const {
       courseId,
       batchId,
@@ -28,11 +28,13 @@ export async function POST(req: NextRequest) {
       subjects,
     } = await req.json();
 
+    // 4️⃣ Check for required fields
     if (!courseId || !batchId || !semesterId || !studentId || !subjects) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const id = admin.firestore().collection("attendances").doc().id;
+    // 5️⃣ Create a new attendance document
+    const id = firestore.collection("attendances").doc().id;
     const attendance = {
       id,
       courseId,
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
-    await admin.firestore().collection("attendances").doc(id).set(attendance);
+    await firestore.collection("attendances").doc(id).set(attendance);
 
     return NextResponse.json({ message: "Attendance created", id }, { status: 201 });
   } catch (err: any) {

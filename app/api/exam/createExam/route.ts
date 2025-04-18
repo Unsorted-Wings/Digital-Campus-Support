@@ -1,38 +1,27 @@
-// app/api/exams/create/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { getToken } from "next-auth/jwt"; 
+import { firestore } from "@/lib/firebase/firebaseAdmin";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1️⃣ Authorization Check
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1️⃣ Authorization Check using NextAuth JWT Token
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    const token = authHeader.split("Bearer ")[1];
-    if (!token)
+    if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    if (decodedToken.role !== "admin") {
+    const { role } = token; // Assuming role is included in the JWT token
+
+    // 2️⃣ Verify that only admins can create exams
+    if (role !== "admin") {
       return NextResponse.json(
         { error: "Forbidden: Only admins can create exams" },
         { status: 403 }
       );
     }
 
-    // 2️⃣ Parse Request Body
+    // 3️⃣ Parse Request Body
     const { name, courseId, batchId, semesterId, scheduleUrl, marks } =
       await req.json();
 
@@ -49,9 +38,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    // 3️⃣ Prepare Data
+
+    // 4️⃣ Prepare Data
     const now = new Date().toISOString();
-    const examRef = admin.firestore().collection("exams").doc();
+    const examRef = firestore.collection("exams").doc(); // Assuming you're using Firestore
     const examId = examRef.id;
 
     const examData = {
@@ -66,7 +56,7 @@ export async function POST(req: NextRequest) {
       updatedAt: now,
     };
 
-    // 4️⃣ Save to Firestore
+    // 5️⃣ Save Exam Data to Firestore
     await examRef.set(examData);
 
     return NextResponse.json(

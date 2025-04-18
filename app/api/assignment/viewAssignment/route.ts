@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt"; 
 import * as admin from "firebase-admin";
 
 if (!admin.apps.length) {
@@ -13,17 +14,20 @@ if (!admin.apps.length) {
 
 export async function GET(req: NextRequest) {
   try {
-    // Authorization
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const token = authHeader.split("Bearer ")[1];
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Authorization using NextAuth JWT Token
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    const decoded = await admin.auth().verifyIdToken(token);
-    if (decoded.role !== "admin") {
+    // Verify if the user has the "admin" role
+    const { role } = token; // Assuming the role is included in the JWT token
+    if (role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Fetch assignments from Firestore
     const snapshot = await admin.firestore().collection("assignments").get();
     const assignments = snapshot.docs.map((doc) => doc.data());
 

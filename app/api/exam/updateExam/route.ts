@@ -1,46 +1,36 @@
-// app/api/exams/update/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
-
-// Initialize Firebase Admin
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { getToken } from "next-auth/jwt"; // Import NextAuth JWT token handler
+import { firestore } from "@/lib/firebase/firebaseAdmin"; // Assuming you're using Firestore for data storage
 
 export async function PUT(req: NextRequest) {
   try {
-    // 1️⃣ Authorization Check
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // 1️⃣ Authorization Check using NextAuth JWT Token
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    const token = authHeader.split("Bearer ")[1];
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    if (decodedToken.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: Only admins can update exams" }, { status: 403 });
+    const { role } = token; // Assuming role is included in the JWT token
+
+    // 2️⃣ Verify that only admins can update exams
+    if (role !== "admin") {
+      return NextResponse.json(
+        { error: "Forbidden: Only admins can update exams" },
+        { status: 403 }
+      );
     }
 
-    // 2️⃣ Parse Request Body
-    const { id, name, courseId, batchId, semesterId, scheduleUrl, marks } = await req.json();
+    // 3️⃣ Parse Request Body
+    const { id, name, courseId, batchId, semesterId, scheduleUrl, marks } =
+      await req.json();
 
     if (!id) {
       return NextResponse.json({ error: "Missing exam ID" }, { status: 400 });
     }
 
-    // 3️⃣ Reference and Update Exam Document
-    const examRef = admin.firestore().collection("exams").doc(id);
+    // 4️⃣ Reference and Update Exam Document
+    const examRef = firestore.collection("exams").doc(id); // Assuming Firestore as the database
     const doc = await examRef.get();
 
     if (!doc.exists) {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 import * as admin from "firebase-admin";
 
+// Initialize Firestore (only)
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -13,29 +15,19 @@ if (!admin.apps.length) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    // 1️⃣ Check Authorization Header
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const token = authHeader.split("Bearer ")[1];
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    // 2️⃣ Verify Admin Token
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    if (decodedToken.role !== "admin") {
+    // 1️⃣ Verify Admin via JWT (NextAuth)
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    if (!token || token.role !== "admin") {
       return NextResponse.json({ error: "Forbidden: Only admins can delete users" }, { status: 403 });
     }
 
-    // 3️⃣ Parse Request Body
+    // 2️⃣ Parse Request Body
     const { uid } = await req.json();
     if (!uid) {
       return NextResponse.json({ error: "User ID (uid) is required" }, { status: 400 });
     }
 
-    // 4️⃣ Delete User from Firebase Authentication
-    await admin.auth().deleteUser(uid);
-
-    // 5️⃣ Delete User from Firestore
+    // 3️⃣ Delete user from Firestore
     await admin.firestore().collection("users").doc(uid).delete();
 
     return NextResponse.json({ message: "User deleted successfully", userId: uid }, { status: 200 });

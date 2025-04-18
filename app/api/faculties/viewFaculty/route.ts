@@ -1,31 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
-
-// Initialize Firebase Admin SDK if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { getToken } from "next-auth/jwt"; 
+import { firestore } from "@/lib/firebase/firebaseAdmin";
 
 export async function GET(req: NextRequest) {
   try {
-    // 1️⃣ Authorization Header
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1️⃣ Check Authorization Header with NextAuth JWT Token
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    const token = authHeader.split("Bearer ")[1];
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    // 2️⃣ Verify Firebase ID Token
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    const { uid, role } = decodedToken;
+    const { role, sub: uid } = token; // Assuming `sub` is the user ID (UID)
 
-    // 3️⃣ Get `facultyId` from query params
+    // 2️⃣ Get `facultyId` from query params
     const url = new URL(req.url);
     const facultyId = url.searchParams.get("facultyId");
 
@@ -33,9 +21,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing faculty ID" }, { status: 400 });
     }
 
-    // 4️⃣ Fetch user and faculty data
-    const userDoc = await admin.firestore().collection("users").doc(facultyId).get();
-    const facultyDoc = await admin.firestore().collection("faculty").doc(facultyId).get();
+    // 3️⃣ Fetch user and faculty data from Firestore
+    const userDoc = await firestore.collection("users").doc(facultyId).get();
+    const facultyDoc = await firestore.collection("faculty").doc(facultyId).get();
 
     if (!userDoc.exists || !facultyDoc.exists) {
       return NextResponse.json({ error: "Faculty not found" }, { status: 404 });
@@ -48,7 +36,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Incomplete faculty data" }, { status: 404 });
     }
 
-    // 5️⃣ Return full details if requester is admin
+    // 4️⃣ Return full details if requester is admin
     if (role === "admin") {
       return NextResponse.json({
         user: {
@@ -70,7 +58,7 @@ export async function GET(req: NextRequest) {
       }, { status: 200 });
     }
 
-    // 6️⃣ Faculty viewing their own data
+    // 5️⃣ Faculty viewing their own data
     if (uid === facultyId) {
       return NextResponse.json({
         user: {
@@ -91,7 +79,7 @@ export async function GET(req: NextRequest) {
       }, { status: 200 });
     }
 
-    // 7️⃣ Default: Public view with basic info
+    // 6️⃣ Default: Public view with basic info
     return NextResponse.json({
       user: {
         id: userData.id,

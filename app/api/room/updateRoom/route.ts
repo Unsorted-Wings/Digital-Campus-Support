@@ -1,33 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { getToken } from "next-auth/jwt"; 
+import { firestore } from "@/lib/firebase/firebaseAdmin"; 
 
 export async function PUT(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1️⃣ Authenticate user via NextAuth JWT
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    const token = authHeader.split("Bearer ")[1];
-    const decoded = await admin.auth().verifyIdToken(token);
-    if (decoded.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
+    // 2️⃣ Check if the user is an admin (ensure the token includes 'role' or a similar field)
+    if (token.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // 3️⃣ Parse the request body
     const { id, name, type, members } = await req.json();
 
-    if (!id) return NextResponse.json({ error: "Missing room ID" }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: "Missing room ID" }, { status: 400 });
+    }
 
-    const ref = admin.firestore().collection("rooms").doc(id);
+    // 4️⃣ Get the room document reference from Firestore
+    const ref = firestore.collection("rooms").doc(id);
     const doc = await ref.get();
-    if (!doc.exists) return NextResponse.json({ error: "Room not found" }, { status: 404 });
 
+    if (!doc.exists) {
+      return NextResponse.json({ error: "Room not found" }, { status: 404 });
+    }
+
+    // 5️⃣ Prepare the update data
     const updatedData: any = {
       updatedAt: new Date().toISOString(),
     };
@@ -35,6 +39,7 @@ export async function PUT(req: NextRequest) {
     if (type) updatedData.type = type;
     if (Array.isArray(members)) updatedData.members = members;
 
+    // 6️⃣ Update the room in Firestore
     await ref.update(updatedData);
 
     return NextResponse.json({ message: "Room updated successfully", id }, { status: 200 });

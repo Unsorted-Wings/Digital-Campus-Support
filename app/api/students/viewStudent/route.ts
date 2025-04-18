@@ -1,31 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
+// app/api/students/view/route.ts
 
-// Initialize Firebase Admin SDK if it's not initialized yet
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { NextRequest, NextResponse } from "next/server";
+import { firestore } from "@/lib/firebase/firebaseAdmin"; // Adjust path if needed
+import { getToken } from "next-auth/jwt";
 
 export async function GET(req: NextRequest) {
   try {
-    // 1️⃣ Check Authorization Header
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1️⃣ Verify Token from NextAuth
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    const token = authHeader.split("Bearer ")[1];
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    // 2️⃣ Verify Token
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    const { uid } = decodedToken; // Get the UID of the currently authenticated user
+    const requesterId = token.sub; // This is the UID of the authenticated user
+    const requesterRole = token.role;
 
-    // 3️⃣ Get the `uid` from the query parameters (or path params depending on your routing setup)
+    // 2️⃣ Get studentId from query params
     const url = new URL(req.url);
     const studentId = url.searchParams.get("studentId");
 
@@ -33,26 +24,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing student ID" }, { status: 400 });
     }
 
-    // 4️⃣ Fetch the Student's User and Student Records
-    const userDoc = await admin.firestore().collection("users").doc(studentId as string).get();
-    const studentDoc = await admin.firestore().collection("students").doc(studentId as string).get();
+    // 3️⃣ Fetch the User and Student Documents
+    const [userDoc, studentDoc] = await Promise.all([
+      firestore.collection("users").doc(studentId).get(),
+      firestore.collection("students").doc(studentId).get()
+    ]);
 
-    // 5️⃣ Check if the user and student exist
     if (!userDoc.exists || !studentDoc.exists) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
-    // 6️⃣ Get user and student data
-    const userData = userDoc.exists ? userDoc.data() : null;
-    const studentData = studentDoc.exists ? studentDoc.data() : null;
+    const userData = userDoc.data();
+    const studentData = studentDoc.data();
 
     if (!userData || !studentData) {
       return NextResponse.json({ error: "Student data is missing or incomplete" }, { status: 404 });
     }
 
-    // 7️⃣ Return Data based on the requester's role
-    if (decodedToken.role === "admin") {
-      // Admin can view all details, including role and profile information
+    // 4️⃣ Return Full Data for Admin
+    if (requesterRole === "admin") {
       return NextResponse.json({
         user: {
           id: userData.id,
@@ -75,8 +65,8 @@ export async function GET(req: NextRequest) {
       }, { status: 200 });
     }
 
-    if (uid === studentId) {
-      // Student can view their own details
+    // 5️⃣ Return Partial Data if Student is viewing themselves
+    if (requesterId === studentId) {
       return NextResponse.json({
         user: {
           id: userData.id,
@@ -96,7 +86,7 @@ export async function GET(req: NextRequest) {
       }, { status: 200 });
     }
 
-    // For any other user, only basic information (name, email) is visible
+    // 6️⃣ Return Public Info for other users
     return NextResponse.json({
       user: {
         id: userData.id,

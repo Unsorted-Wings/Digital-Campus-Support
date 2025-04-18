@@ -1,77 +1,60 @@
-import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
-import bcrypt from "bcryptjs";
+// app/api/students/create/route.ts
 
-// Initialize Firebase Admin SDK if it's not initialized yet
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { NextRequest, NextResponse } from "next/server";
+import { firestore } from "@/lib/firebase/firebaseAdmin"; // Make sure this points to your initialized Firestore
+import bcrypt from "bcryptjs";
+import { getToken } from "next-auth/jwt";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1️⃣ Check Authorization Header
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1️⃣ Authenticate Admin via NextAuth
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    const token = authHeader.split("Bearer ")[1];
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    // 2️⃣ Verify Admin Token
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    if (decodedToken.role !== "admin") {
+    if (!token || token.role !== "admin") {
       return NextResponse.json({ error: "Forbidden: Only admins can create students" }, { status: 403 });
     }
 
-    // 3️⃣ Parse Request Body
+    // 2️⃣ Extract request data
     const { email, password, name, rollNumber, course, description, isAlumni } = await req.json();
+    if (!email || !password || !name || !rollNumber || !course) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
 
-if (!email || !password || !name || !rollNumber || !course) {
-  return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-}
+    // 3️⃣ Generate Firebase-style UUID
+    const studentRef = firestore.collection("students").doc();
+    const studentId = studentRef.id;
 
-    // 4️⃣ Hash the Password
+    // 4️⃣ Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 5️⃣ Create Firebase Auth User (for the student)
-    const userRecord = await admin.auth().createUser({
-      email,
-      password:hashedPassword, // This password is only used for Firebase Auth
-      displayName: name,
-    });
-
-    // 6️⃣ Create Student Record in Firestore
-    const studentId = userRecord.uid; // Use user UID as student ID
+    // 5️⃣ Create student record
+    const timestamp = new Date().toISOString();
     const studentData = {
       id: studentId,
       rollNumber,
       course,
       description: description || "",
       isAlumni: isAlumni ?? false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: timestamp,
+      updatedAt: timestamp,
     };
 
-    // Store student in the "students" collection
-    await admin.firestore().collection("students").doc(studentId).set(studentData);
+    await studentRef.set(studentData);
 
-    // 7️⃣ Store User in "users" collection
-    await admin.firestore().collection("users").doc(studentId).set({
+    // 6️⃣ Create user record (linked to student)
+    const userData = {
       id: studentId,
       email,
       name,
-      role: "student", // Mark the user as a student in the users collection
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+      role: "student",
+      password: hashedPassword,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
 
-    // 8️⃣ Return Success Response
-    return NextResponse.json({ message: "Student created successfully", studentId: studentId }, { status: 201 });
+    await firestore.collection("users").doc(studentId).set(userData);
+
+    return NextResponse.json({ message: "Student created successfully", studentId }, { status: 201 });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

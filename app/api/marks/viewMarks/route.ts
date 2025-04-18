@@ -1,48 +1,32 @@
 // app/api/marks/view/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
-
-// ✅ Initialize Firebase Admin SDK
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+import { getToken } from "next-auth/jwt"; // Import getToken from NextAuth
+import { firestore } from "@/lib/firebase/firebaseAdmin"; // Assuming you have Firestore connected
 
 export async function GET(req: NextRequest) {
   try {
-    // 1️⃣ Check Admin Authorization
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // 1️⃣ Verify Admin Authorization with NextAuth JWT token
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    const token = authHeader.split("Bearer ")[1];
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    if (decodedToken.role !== "admin") {
+    // 2️⃣ Check if the user has the 'admin' role
+    if (token.role !== "admin") {
       return NextResponse.json(
         { error: "Forbidden: Only admins can view marks" },
         { status: 403 }
       );
     }
 
-    // 2️⃣ Optionally filter by studentId (query param)
+    // 3️⃣ Optionally filter by studentId (query param)
     const { searchParams } = new URL(req.url);
     const studentId = searchParams.get("studentId");
     const examId = searchParams.get("examId");
 
-    let marksQuery: FirebaseFirestore.Query = admin
-      .firestore()
-      .collection("marks");
+    let marksQuery: FirebaseFirestore.Query = firestore.collection("marks");
     if (studentId) {
       marksQuery = marksQuery.where("studentId", "==", studentId);
     }

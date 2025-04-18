@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as admin from "firebase-admin";
+import { getToken } from "next-auth/jwt"; 
+// import admin from "firebase-admin";
+import { firestore ,admin} from "@/lib/firebase/firebaseAdmin"; // Adjust the import path as necessary
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -13,14 +15,16 @@ if (!admin.apps.length) {
 
 export async function POST(req: NextRequest) {
   try {
-    // Authorization
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const token = authHeader.split("Bearer ")[1];
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Authorization using NextAuth JWT Token
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    const decoded = await admin.auth().verifyIdToken(token);
-    if (decoded.role !== "admin") {
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Verify if the user has the "admin" role
+    const { role } = token; // Assuming the role is included in the JWT token
+    if (role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -40,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const ref = admin.firestore().collection("assignments").doc();
+    const ref = firestore.collection("assignments").doc();
     const newAssignment = {
       id: ref.id,
       title,

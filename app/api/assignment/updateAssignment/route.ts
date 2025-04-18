@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt"; // Import NextAuth's JWT token handler
 import * as admin from "firebase-admin";
 
 if (!admin.apps.length) {
@@ -13,17 +14,20 @@ if (!admin.apps.length) {
 
 export async function PUT(req: NextRequest) {
   try {
-    // Authorization
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const token = authHeader.split("Bearer ")[1];
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Authorization using NextAuth JWT Token
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    const decoded = await admin.auth().verifyIdToken(token);
-    if (decoded.role !== "admin") {
+    // Verify if the user has the "admin" role
+    const { role } = token; // Assuming the role is included in the JWT token
+    if (role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Body processing
     const { id, ...updates } = await req.json();
     if (!id) return NextResponse.json({ error: "Missing assignment ID" }, { status: 400 });
 
@@ -34,6 +38,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
     }
 
+    // Update assignment in Firestore
     await docRef.update({
       ...updates,
       updatedAt: new Date().toISOString(),

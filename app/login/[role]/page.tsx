@@ -8,18 +8,48 @@ import { ModeToggle } from "@/components/ThemeToggle";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { signIn } from "next-auth/react"; // Import NextAuth signIn method
+import { useSession } from "next-auth/react"; // Import useSession hook
 
 export default function RoleLoginPage({ params }: { params: { role: string } }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null); // State to store error message
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { data: session, status } = useSession(); // Get session data
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Add your login logic here (e.g., API call)
-    console.log(`Logging in as ${params.role}:`, { email, password });
-    // Example: redirect to dashboard or show success message
-    router.push(`/${params.role}/home`);
+    setError(null); // Reset error before each login attempt
+
+    try {
+      // Step 1: NextAuth Authentication - Sign in the user
+      const result = await signIn("credentials", {
+        redirect: false, // Prevent automatic redirect
+        email,
+        password,
+      });
+
+      if (result?.error) {
+        setError("Invalid email or password.");
+        return;
+      }
+
+      console.log(`Logged in as ${params.role}:`, { email, password });
+
+      // Step 2: Check if the user's role matches the requested role
+      if (session?.user?.role === params.role) {
+        // Redirect to the role-specific dashboard if roles match
+        router.push(`/${params.role}/home`);
+      } else {
+        setError("Access denied.");
+      }
+    } catch (err: any) {
+      // Handle any other errors
+      setError("An error occurred while logging in.");
+      console.error(err.message);
+    }
   };
 
   const role = params.role.charAt(0).toUpperCase() + params.role.slice(1);
@@ -43,6 +73,11 @@ export default function RoleLoginPage({ params }: { params: { role: string } }) 
         </CardHeader>
         <CardContent className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="text-red-500 text-center mb-4">
+                {error} {/* Show error message */}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground font-medium">
                 Email
