@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, X } from "lucide-react";
+import { FileText, Plus, X, Trash2, Edit } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
@@ -16,6 +16,7 @@ interface Assignment {
   title: string;
   course: string;
   dueDate: string;
+  document?: File | null;
   submissions: number;
   totalStudents: number;
 }
@@ -30,9 +31,9 @@ interface Submission {
 
 export default function FacultyAssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([
-    { id: 1, title: "Math Problem Set", course: "Mathematics 101", dueDate: "2025-04-10", submissions: 25, totalStudents: 30 },
-    { id: 2, title: "Physics Lab Report", course: "Physics 201", dueDate: "2025-04-08", submissions: 20, totalStudents: 25 },
-    { id: 3, title: "CS Project", course: "CS 301", dueDate: "2025-04-15", submissions: 30, totalStudents: 35 },
+    { id: 1, title: "Math Problem Set", course: "Mathematics 101", dueDate: "2025-04-10", document: null, submissions: 25, totalStudents: 30 },
+    { id: 2, title: "Physics Lab Report", course: "Physics 201", dueDate: "2025-04-08", document: null, submissions: 20, totalStudents: 25 },
+    { id: 3, title: "CS Project", course: "CS 301", dueDate: "2025-04-15", document: null, submissions: 30, totalStudents: 35 },
   ]);
 
   const [submissions, setSubmissions] = useState<{ [key: number]: Submission[] }>({
@@ -47,24 +48,65 @@ export default function FacultyAssignmentsPage() {
 
   const [selectedAssignment, setSelectedAssignment] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newAssignment, setNewAssignment] = useState({ title: "", course: "", dueDate: "" });
+  const [editAssignment, setEditAssignment] = useState<Assignment | null>(null);
+  const [newAssignment, setNewAssignment] = useState({ title: "", course: "", dueDate: "", document: null as File | null });
+  const courses = ["Mathematics 101", "Physics 201", "CS 301"];
 
-  const courses = ["Mathematics 101", "Physics 201", "CS 301"]; // Mock course list
-
-  const handleAddAssignment = () => {
+  const handleAddOrUpdateAssignment = () => {
     if (newAssignment.title && newAssignment.course && newAssignment.dueDate) {
-      const newId = assignments.length + 1;
-      setAssignments([...assignments, { 
-        id: newId, 
-        title: newAssignment.title, 
-        course: newAssignment.course, 
-        dueDate: newAssignment.dueDate, 
-        submissions: 0, 
-        totalStudents: courses.find(c => c === newAssignment.course) === "Mathematics 101" ? 30 : newAssignment.course === "Physics 201" ? 25 : 35 
-      }]);
-      setNewAssignment({ title: "", course: "", dueDate: "" });
+      if (editAssignment) {
+        // Update existing assignment
+        setAssignments((prev) =>
+          prev.map((a) =>
+            a.id === editAssignment.id
+              ? { ...a, title: newAssignment.title, course: newAssignment.course, dueDate: newAssignment.dueDate, document: newAssignment.document }
+              : a
+          )
+        );
+        console.log("Updated assignment:", newAssignment);
+      } else {
+        // Add new assignment
+        const newId = assignments.length + 1;
+        setAssignments((prev) => [
+          ...prev,
+          {
+            id: newId,
+            title: newAssignment.title,
+            course: newAssignment.course,
+            dueDate: newAssignment.dueDate,
+            document: newAssignment.document,
+            submissions: 0,
+            totalStudents: courses.find((c) => c === newAssignment.course) === "Mathematics 101" ? 30 : newAssignment.course === "Physics 201" ? 25 : 35,
+          },
+        ]);
+        console.log("Added assignment:", newAssignment);
+      }
+      setNewAssignment({ title: "", course: "", dueDate: "", document: null });
+      setEditAssignment(null);
       setShowAddForm(false);
-      console.log("Added assignment:", newAssignment);
+    }
+  };
+
+  const handleRemoveAssignment = (id: number) => {
+    setAssignments((prev) => prev.filter((a) => a.id !== id));
+    console.log(`Removed assignment ID: ${id}`);
+  };
+
+  const handleEditAssignment = (assignment: Assignment) => {
+    setEditAssignment(assignment);
+    setNewAssignment({
+      title: assignment.title,
+      course: assignment.course,
+      dueDate: assignment.dueDate,
+      document: assignment.document ?? null,
+    });
+    setShowAddForm(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewAssignment((prev) => ({ ...prev, document: file }));
     }
   };
 
@@ -84,66 +126,87 @@ export default function FacultyAssignmentsPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
-      <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
-        <CardHeader className="p-4 flex items-center justify-between">
-          <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <FileText className="h-6 w-6 text-primary" />
+      <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
+        <CardHeader className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
+          <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
             Assignments
           </CardTitle>
-          <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-                <Plus className="h-5 w-5 mr-2" />
-                Add Assignment
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
-              <DialogHeader>
-                <DialogTitle className="text-foreground">Add New Assignment</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 p-4">
-                <div>
-                  <Label htmlFor="title" className="text-foreground">Title</Label>
-                  <Input
-                    id="title"
-                    value={newAssignment.title}
-                    onChange={(e) => setNewAssignment({ ...newAssignment, title: e.target.value })}
-                    placeholder="Assignment title"
-                    className="bg-muted/50 border-border"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="course" className="text-foreground">Course</Label>
-                  <Select
-                    value={newAssignment.course}
-                    onValueChange={(value) => setNewAssignment({ ...newAssignment, course: value })}
-                  >
-                    <SelectTrigger className="bg-muted/50 border-border">
-                      <SelectValue placeholder="Select course" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses.map((course) => (
-                        <SelectItem key={course} value={course}>{course}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="dueDate" className="text-foreground">Due Date</Label>
-                  <Input
-                    id="dueDate"
-                    type="date"
-                    value={newAssignment.dueDate}
-                    onChange={(e) => setNewAssignment({ ...newAssignment, dueDate: e.target.value })}
-                    className="bg-muted/50 border-border"
-                  />
-                </div>
-                <Button onClick={handleAddAssignment} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                  Create Assignment
+          <div className="flex items-center gap-2 p-2">
+            <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-lg px-4 py-2 shadow-sm hover:shadow-md transition-all duration-300">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Assignment
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
+                <DialogHeader>
+                  <DialogTitle className="text-foreground">{editAssignment ? "Edit Assignment" : "Add New Assignment"}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 p-4">
+                  <div>
+                    <Label htmlFor="title" className="text-foreground">Title</Label>
+                    <Input
+                      id="title"
+                      value={newAssignment.title}
+                      onChange={(e) => setNewAssignment((prev) => ({ ...prev, title: e.target.value }))}
+                      placeholder="Assignment title"
+                      className="bg-muted/50 border-border"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="course" className="text-foreground">Course</Label>
+                    <Select
+                      value={newAssignment.course}
+                      onValueChange={(value) => setNewAssignment((prev) => ({ ...prev, course: value }))}
+                    >
+                      <SelectTrigger className="bg-muted/50 border-border">
+                        <SelectValue placeholder="Select course" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {courses.map((course) => (
+                          <SelectItem key={course} value={course}>{course}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="dueDate" className="text-foreground">Due Date</Label>
+                    <Input
+                      id="dueDate"
+                      type="date"
+                      value={newAssignment.dueDate}
+                      onChange={(e) => setNewAssignment((prev) => ({ ...prev, dueDate: e.target.value }))}
+                      className="bg-muted/50 border-border"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="document" className="text-foreground">Assignment Document</Label>
+                    <Input
+                      id="document"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleFileChange}
+                      className="bg-muted/50 border-border"
+                    />
+                    {newAssignment.document && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Selected: {newAssignment.document.name}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={handleAddOrUpdateAssignment}
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {editAssignment ? "Update Assignment" : "Create Assignment"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
       </Card>
 
@@ -159,7 +222,7 @@ export default function FacultyAssignmentsPage() {
                     <TableHead className="text-foreground">Course</TableHead>
                     <TableHead className="text-foreground">Due Date</TableHead>
                     <TableHead className="text-foreground">Submissions</TableHead>
-                    <TableHead className="text-foreground">Action</TableHead>
+                    <TableHead className="text-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -174,7 +237,7 @@ export default function FacultyAssignmentsPage() {
                       <TableCell className="text-muted-foreground">
                         {assignment.submissions}/{assignment.totalStudents}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="flex justify-between gap-4">
                         <Button
                           variant="outline"
                           size="sm"
@@ -183,6 +246,24 @@ export default function FacultyAssignmentsPage() {
                         >
                           View Submissions
                         </Button>
+                        <div className="flex ">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditAssignment(assignment)}
+                            className="text-foreground hover:bg-primary/10"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveAssignment(assignment.id)}
+                            className="text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

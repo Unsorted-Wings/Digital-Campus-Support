@@ -1,126 +1,155 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Calendar, Bell, User } from "lucide-react";
-import { format } from "date-fns";
+import { Bell, Calendar, Clock, LogOut } from "lucide-react";
 
 export default function FacultyHomePage() {
-  // Mock data
   const profile = {
     name: "Dr. Emily Carter",
-    id: "FAC12345",
+    role: "Faculty",
     email: "emily.carter@university.edu",
     department: "Mathematics",
-    profilePic: "/faculty/emily-carter.jpg", // Placeholder image path
+    avatar: "/faculty/emily-carter.jpg",
   };
 
   const schedule = [
-    { id: 1, title: "Math 101 Lecture", course: "Mathematics 101", time: new Date(2025, 3, 8, 10, 0), duration: "1h 30m" },
-    { id: 2, title: "Physics 201 Lab", course: "Physics 201", time: new Date(2025, 3, 8, 14, 0), duration: "2h" },
-    { id: 3, title: "CS 301 Review", course: "CS 301", time: new Date(2025, 3, 9, 9, 0), duration: "1h" },
+    { time: "09:00 AM", event: "Mathematics 101 Lecture", location: "Room 101" },
+    { time: "11:00 AM", event: "Physics 201 Lab", location: "Lab B" },
+    { time: "02:00 PM", event: "CS 301 Office Hours", location: "Office 305" },
+    { time: "04:00 PM", event: "Faculty Meeting", location: "Conference Room" },
   ];
 
   const notifications = [
-    { id: 1, message: "Grade Math Problem Set due by 2025-04-10", time: "2 hours ago" },
-    { id: 2, message: "New submission received for Physics Lab Report", time: "Yesterday" },
-    { id: 3, message: "Faculty meeting scheduled for 2025-04-12", time: "3 days ago" },
+    { title: "Grade Math Assignment", due: "Tomorrow, 11:59 PM", type: "urgent" },
+    { title: "New Physics Lab Submissions", due: "Next Week", type: "info" },
+    { title: "CS Project Review", due: "Apr 15, 2025", type: "warning" },
   ];
 
   return (
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_2.5fr_1fr] gap-6 h-full">
-        {/* Profile Section */}
-        <Card className="lg:col-span-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20 opacity-20 pointer-events-none" />
-          <CardHeader className="p-4 border-b border-border relative z-10">
-            <CardTitle className="text-xl font-semibold text-foreground flex items-center gap-2">
-              <User className="h-5 w-5 text-primary" />
-              Profile
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 flex flex-col items-center relative z-10">
-            <Avatar className="w-24 h-24 mb-4">
-              <AvatarImage src={profile.profilePic} alt={profile.name} />
-              <AvatarFallback className="bg-primary/20 text-primary text-2xl">
-                {profile.name.split(" ").map(n => n[0]).join("")}
-              </AvatarFallback>
-            </Avatar>
-            <h3 className="text-lg font-semibold text-foreground">{profile.name}</h3>
-            <p className="text-sm text-muted-foreground">Faculty ID: {profile.id}</p>
-            <p className="text-sm text-muted-foreground">{profile.email}</p>
-            <p className="text-sm text-muted-foreground">Department: {profile.department}</p>
-          </CardContent>
-        </Card>
-          {/* Schedule Section */}
-          <Card className="flex-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-            <CardHeader className="p-4 border-b border-border relative z-10">
-              <CardTitle className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
-                Upcoming Schedule
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 relative z-10">
-              <ScrollArea className="h-[250px]">
-                {schedule.length > 0 ? (
-                  schedule.map((event) => (
-                    <div
-                      key={event.id}
-                      className="flex items-center gap-4 p-4 mb-4 last:mb-0 bg-muted/50 rounded-lg hover:bg-primary/10 transition-all duration-300"
-                    >
-                      <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                        <Calendar className="h-6 w-6 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-foreground font-medium">{event.title}</p>
-                        <p className="text-sm text-muted-foreground">{event.course}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {format(event.time, "MMMM d, h:mm a")} • {event.duration}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-muted-foreground text-center">No upcoming events</p>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_2.5fr_1fr] gap-6">
+      {/* Column 1: Profile Card */}
+      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl flex flex-col h-[calc(100vh-5rem)]">
+        <CardHeader className="text-center border-b border-border">
+          <Avatar className="w-20 h-20 mx-auto mb-4">
+            <AvatarImage src={profile.avatar} alt={profile.name} />
+            <AvatarFallback className="bg-primary/20 text-primary text-xl">
+              {profile.name.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+          <CardTitle className="text-xl font-bold text-foreground">
+            {profile.name}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">{profile.role}</p>
+        </CardHeader>
+        <CardContent className="p-4 flex-1 flex flex-col justify-between">
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Email:</span> {profile.email}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Department:</span> {profile.department}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            className="w-full mt-4 border-border text-foreground hover:bg-primary/10"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Log Out
+          </Button>
+        </CardContent>
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-20" />
+      </Card>
 
-          {/* Notifications Section */}
-          <Card className="flex-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-            <CardHeader className="p-4 border-b border-border relative z-10">
-              <CardTitle className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" />
-                Notifications
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 relative z-10">
-              <ScrollArea className="h-[250px]">
-                {notifications.length > 0 ? (
-                  notifications.map((noti) => (
-                    <div
-                      key={noti.id}
-                      className="flex items-center gap-4 p-4 mb-4 last:mb-0 bg-muted/50 rounded-lg hover:bg-primary/10 transition-all duration-300"
-                    >
-                      <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                        <Bell className="h-6 w-6 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-foreground">{noti.message}</p>
-                        <p className="text-sm text-muted-foreground">{noti.time}</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-muted-foreground text-center">No new notifications</p>
+      {/* Column 2: Schedule */}
+      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl h-[calc(100vh-5rem)] overflow-y-auto">
+        <CardHeader className="border-b border-border sticky top-0 bg-card/95 z-10">
+          <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-2">
+            <Calendar className="h-6 w-6 text-primary" />
+            Today's Schedule
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          {schedule.length > 0 ? (
+            schedule.map((item, index) => (
+              <div
+                key={index}
+                className="relative flex items-center justify-between p-4 bg-card rounded-lg shadow-md hover:shadow-xl hover:bg-card/90 transition-all duration-300 overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/15 to-secondary/15 opacity-30 group-hover:opacity-40 transition-opacity duration-300" />
+                <div className="relative flex items-center gap-4">
+                  <div className="flex-shrink-0 w-12 text-center">
+                    <Badge variant="outline" className="text-primary border-primary px-2 py-1">
+                      {item.time}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-foreground font-semibold text-lg">{item.event}</p>
+                    <p className="text-sm text-muted-foreground">{item.location}</p>
+                  </div>
+                </div>
+                <Clock className="relative h-5 w-5 text-muted-foreground" />
+              </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No events scheduled for today</p>
+          )}
+        </CardContent>
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20" />
+      </Card>
+
+      {/* Column 3: Notifications */}
+      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl h-[calc(100vh-5rem)] overflow-y-auto">
+        <CardHeader className="border-b border-border sticky top-0 bg-card/95 z-10">
+          <CardTitle className="text-xl font-semibold text-foreground flex items-center gap-2">
+            <Bell className="h-5 w-5 text-primary" />
+            Notifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 space-y-4">
+          {notifications.length > 0 ? (
+            notifications.map((item, index) => (
+              <div
+                key={index}
+                className={cn(
+                  "relative flex items-center gap-3 p-3 rounded-lg bg-card shadow-sm hover:bg-card/90 transition-all duration-300 overflow-hidden",
+                  item.type === "urgent" && "border-l-4 border-destructive",
+                  item.type === "warning" && "border-l-4 border-yellow-500",
+                  item.type === "info" && "border-l-4 border-primary"
                 )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-      </div>
+              >
+                <div
+                  className={cn(
+                    "absolute inset-0 bg-gradient-to-r opacity-30 group-hover:opacity-40 transition-opacity duration-300",
+                    item.type === "urgent" && "from-destructive/20 to-transparent",
+                    item.type === "warning" && "from-yellow-500/20 to-secondary/15",
+                    item.type === "info" && "from-primary/20 to-secondary/15"
+                  )}
+                />
+                <div className="relative flex-1">
+                  <p className="text-foreground font-medium text-sm">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">{item.due}</p>
+                </div>
+                <div
+                  className={cn(
+                    "relative w-2 h-2 rounded-full",
+                    item.type === "urgent" && "bg-destructive",
+                    item.type === "warning" && "bg-yellow-500",
+                    item.type === "info" && "bg-primary"
+                  )}
+                />
+              </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground text-center py-8 text-sm">No new notifications</p>
+          )}
+        </CardContent>
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-20" />
+      </Card>
+    </div>
   );
 }

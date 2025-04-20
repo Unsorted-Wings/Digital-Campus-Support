@@ -123,16 +123,32 @@ export default function FacultySchedulePage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
-      <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
-        <CardHeader className="p-4 flex items-center justify-between">
-          <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <CalendarIcon className="h-6 w-6 text-primary" />
+      <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
+        <CardHeader className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
+          <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5 text-primary" />
             Schedule
           </CardTitle>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={() => setCurrentDate(new Date())} className="border-border text-foreground hover:bg-primary/10">Today</Button>
-            <Button variant="outline" onClick={() => navigate("prev")} className="border-border text-foreground hover:bg-primary/10"><ChevronLeft className="h-5 w-5" /></Button>
-            <Button variant="outline" onClick={() => navigate("next")} className="border-border text-foreground hover:bg-primary/10"><ChevronRight className="h-5 w-5" /></Button>
+          <div className="flex items-center gap-2 p-2">
+            <Button
+              onClick={() => setCurrentDate(new Date())}
+              className="bg-primary/10 text-foreground hover:bg-primary/20 px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
+            >
+              Today
+            </Button>
+            <Button
+              onClick={() => navigate("prev")}
+              className="bg-primary/10 text-foreground hover:bg-primary/20 p-2 rounded-lg  shadow-sm hover:shadow-md transition-all duration-300"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={() => navigate("next")}
+              className="bg-primary/10 text-foreground hover:bg-primary/20 p-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </CardHeader>
       </Card>

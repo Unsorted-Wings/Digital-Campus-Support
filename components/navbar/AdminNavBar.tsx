@@ -21,17 +21,15 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
-export default function FacultyNavBar() {
+export default function AdminNavbar() {
   const [isOpen, setIsOpen] = useState(false);
-
+  
   const navItems = [
-    { name: "Home", href: "/faculty/home", icon: Home },
-    { name: "Gradebook", href: "/faculty/gradebook", icon: Book },
-    { name: "Chat", href: "/faculty/chat", icon: MessageSquare },
-    { name: "Schedule", href: "/faculty/schedule", icon: Calendar },
-    { name: "Assignment Submission", href: "/faculty/assignments", icon: Upload },
-    { name: "Doc Repo", href: "/faculty/docs", icon: Folder },
-    { name: "Reviews", href: "/faculty/reviews", icon: CheckSquare },
+    { name: "Home", href: "/admin/home", icon: Home },
+    { name: "Chat", href: "/admin/chat", icon: MessageSquare },
+    { name: "Assignments", href: "/admin/assignments", icon: Upload },
+    { name: "Documents", href: "/admin/docs", icon: Folder },
+    { name: "Faculty Reviews", href: "/admin/reviews", icon: MessageSquare },
   ];
 
   return (
