@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt"; 
 // import admin from "firebase-admin";
-import { firestore ,admin} from "@/lib/firebase/firebaseAdmin"; // Adjust the import path as necessary
+import { firestore ,admin} from "@/lib/firebase/firebaseAdmin";
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -38,9 +38,10 @@ export async function POST(req: NextRequest) {
       subjectId,
       teacherId,
       dueDate,
+      assignmentDocUrl
     } = await req.json();
 
-    if (!title || !description || !courseId || !batchId || !semesterId || !subjectId || !teacherId || !dueDate) {
+    if (!title || !description || !courseId || !batchId || !semesterId || !subjectId || !teacherId || !dueDate || !assignmentDocUrl) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
       subjectId,
       teacherId,
       dueDate,
+      assignmentDocUrl,
       submittedBy: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

@@ -8,6 +8,7 @@ export type Assignment = {
     subjectId: string;
     teacherId: string;
     dueDate: string;
+    assignmentDocUrl: string;
     submittedBy: Array<string>;
     createdAt: string;
     updatedAt: string;
