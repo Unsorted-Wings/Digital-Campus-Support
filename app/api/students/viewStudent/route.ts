@@ -56,7 +56,8 @@ export async function GET(req: NextRequest) {
         student: {
           id: studentData.id,
           rollNumber: studentData.rollNumber,
-          course: studentData.course,
+          courseId: studentData.course,
+          batchId: studentData.batchId,
           description: studentData.description || "",
           isAlumni: studentData.isAlumni ?? false,
           createdAt: studentData.createdAt,
@@ -79,7 +80,8 @@ export async function GET(req: NextRequest) {
         student: {
           id: studentData.id,
           rollNumber: studentData.rollNumber,
-          course: studentData.course,
+          courseId: studentData.course,
+          batchId: studentData.batchId,
           createdAt: studentData.createdAt,
           updatedAt: studentData.updatedAt,
         },
@@ -96,7 +98,8 @@ export async function GET(req: NextRequest) {
       student: {
         id: studentData.id,
         rollNumber: studentData.rollNumber,
-        course: studentData.course,
+        courseId: studentData.course,
+        batchId: studentData.batchId,
       },
     }, { status: 200 });
 

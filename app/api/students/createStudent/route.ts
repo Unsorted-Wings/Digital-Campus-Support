@@ -1,7 +1,7 @@
 // app/api/students/create/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { firestore } from "@/lib/firebase/firebaseAdmin"; // Make sure this points to your initialized Firestore
+import { firestore, FieldValue } from "@/lib/firebase/firebaseAdmin";
 import bcrypt from "bcryptjs";
 import { getToken } from "next-auth/jwt";
 
@@ -11,13 +11,28 @@ export async function POST(req: NextRequest) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
     if (!token || token.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: Only admins can create students" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Only admins can create students" },
+        { status: 403 }
+      );
     }
 
     // 2️⃣ Extract request data
-    const { email, password, name, rollNumber, course, description, isAlumni } = await req.json();
-    if (!email || !password || !name || !rollNumber || !course) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    const {
+      email,
+
+      name,
+      rollNumber,
+      courseId,
+      batchId,
+      description,
+      isAlumni,
+    } = await req.json();
+    if (!email || !name || !rollNumber || !courseId || !batchId) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
     // 3️⃣ Generate Firebase-style UUID
@@ -25,6 +40,7 @@ export async function POST(req: NextRequest) {
     const studentId = studentRef.id;
 
     // 4️⃣ Hash the password
+    const password = process.env.DEFAULT_STUDENT_PASSWORD || "defaultPassword";
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 5️⃣ Create student record
@@ -32,7 +48,8 @@ export async function POST(req: NextRequest) {
     const studentData = {
       id: studentId,
       rollNumber,
-      course,
+      courseId,
+      batchId,
       description: description || "",
       isAlumni: isAlumni ?? false,
       createdAt: timestamp,
@@ -54,8 +71,18 @@ export async function POST(req: NextRequest) {
 
     await firestore.collection("users").doc(studentId).set(userData);
 
-    return NextResponse.json({ message: "Student created successfully", studentId }, { status: 201 });
+    // Add student ID to batch
 
+    const batchRef = firestore.collection("batches").doc(batchId);
+    await batchRef.update({
+      students: FieldValue.arrayUnion(studentId),
+      updatedAt: timestamp,
+    });
+
+    return NextResponse.json(
+      { message: "Student created successfully", studentId },
+      { status: 201 }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

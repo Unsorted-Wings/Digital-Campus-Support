@@ -1,7 +1,7 @@
 // app/api/semesterSubjects/create/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { firestore } from "@/lib/firebase/firebaseAdmin"; // Adjust path as needed
+import { firestore, FieldValue } from "@/lib/firebase/firebaseAdmin"; // Adjust path as needed
 import { getToken } from "next-auth/jwt";
 
 export async function POST(req: NextRequest) {
@@ -18,10 +18,14 @@ export async function POST(req: NextRequest) {
     }
 
     // 2️⃣ Parse Request Body
-    const { semesterDetailId, subjectId, teacherId, category } = await req.json();
+    const { semesterDetailId, subjectId, teacherId, category } =
+      await req.json();
 
     if (!semesterDetailId || !subjectId || !teacherId) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
     // 3️⃣ Create Firestore Document
@@ -40,8 +44,18 @@ export async function POST(req: NextRequest) {
 
     await docRef.set(data);
 
-    return NextResponse.json({ message: "Semester subject created", data }, { status: 201 });
+    const batchRef = firestore
+      .collection("semesterDetails")
+      .doc(semesterDetailId);
+    await batchRef.update({
+      subjects: FieldValue.arrayUnion(docRef.id),
+      updatedAt: timestamp,
+    });
 
+    return NextResponse.json(
+      { message: "Semester subject created", data },
+      { status: 201 }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

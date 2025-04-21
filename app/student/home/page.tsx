@@ -6,12 +6,32 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Bell, Calendar, Clock, LogOut } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function HomePage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const logOutClickHandler = async () => {
+    console.log("Logging out...");
+    localStorage.removeItem("user");
+    await signOut({ redirect: false });
+    router.push("/login");
+  };
+
   const profile = {
-    name: "Jane Doe",
-    role: "Student",
-    email: "jane.doe@example.com",
+    name: user?.name || "Jane Doe",
+    role: user?.role || "Student",
+    email: user?.email || "jane@doe.com",
     avatar: "/avatar-placeholder.jpg",
   };
 
@@ -47,12 +67,14 @@ export default function HomePage() {
         <CardContent className="p-4 flex-1 flex flex-col justify-between">
           <div className="space-y-3">
             <div className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">Email:</span> {profile.email}
+              <span className="font-medium text-foreground">Email:</span>{" "}
+              {profile.email}
             </div>
           </div>
           <Button
             variant="outline"
-            className="w-full mt-4 border-border text-foreground hover:bg-primary/10"
+            className="w-full mt-4 border-border text-foreground hover:bg-primary/10 cursor-pointer"
+            onClick={logOutClickHandler}
           >
             <LogOut className="mr-2 h-4 w-4" />
             Log Out
@@ -79,20 +101,29 @@ export default function HomePage() {
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/15 to-secondary/15 opacity-30 group-hover:opacity-40 transition-opacity duration-300" />
                 <div className="relative flex items-center gap-4">
                   <div className="flex-shrink-0 w-12 text-center">
-                    <Badge variant="outline" className="text-primary border-primary px-2 py-1">
+                    <Badge
+                      variant="outline"
+                      className="text-primary border-primary px-2 py-1"
+                    >
                       {item.time}
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-foreground font-semibold text-lg">{item.event}</p>
-                    <p className="text-sm text-muted-foreground">{item.location}</p>
+                    <p className="text-foreground font-semibold text-lg">
+                      {item.event}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {item.location}
+                    </p>
                   </div>
                 </div>
                 <Clock className="relative h-5 w-5 text-muted-foreground" />
               </div>
             ))
           ) : (
-            <p className="text-muted-foreground text-center py-8">No events scheduled for today</p>
+            <p className="text-muted-foreground text-center py-8">
+              No events scheduled for today
+            </p>
           )}
         </CardContent>
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20" />
@@ -121,13 +152,17 @@ export default function HomePage() {
                 <div
                   className={cn(
                     "absolute inset-0 bg-gradient-to-r opacity-30 group-hover:opacity-40 transition-opacity duration-300",
-                    item.type === "urgent" && "from-destructive/20 to-transparent",
-                    item.type === "warning" && "from-yellow-500/20 to-secondary/15",
+                    item.type === "urgent" &&
+                      "from-destructive/20 to-transparent",
+                    item.type === "warning" &&
+                      "from-yellow-500/20 to-secondary/15",
                     item.type === "info" && "from-primary/20 to-secondary/15"
                   )}
                 />
                 <div className="relative flex-1">
-                  <p className="text-foreground font-medium text-sm">{item.title}</p>
+                  <p className="text-foreground font-medium text-sm">
+                    {item.title}
+                  </p>
                   <p className="text-xs text-muted-foreground">{item.due}</p>
                 </div>
                 <div
@@ -141,7 +176,9 @@ export default function HomePage() {
               </div>
             ))
           ) : (
-            <p className="text-muted-foreground text-center py-8 text-sm">No new notifications</p>
+            <p className="text-muted-foreground text-center py-8 text-sm">
+              No new notifications
+            </p>
           )}
         </CardContent>
         <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-20" />

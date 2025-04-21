@@ -14,10 +14,10 @@ export async function PUT(req: NextRequest) {
     }
 
     // 2️⃣ Parse Request Body
-    const { uid, email, name, role, profilePicture, rollNumber, course, description, isAlumni } = await req.json();
+    const { uid, email, name, role, profilePicture, rollNumber, courseId,batchId, description, isAlumni } = await req.json();
 
     // 3️⃣ Validate Required Fields
-    if (!uid || !email || !name || !rollNumber || !course || !role) {
+    if (!uid || !email || !name || !rollNumber || !courseId || !role || !batchId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -47,7 +47,8 @@ export async function PUT(req: NextRequest) {
 
     const updatedStudentData = {
       rollNumber,
-      course,
+      courseId,
+      batchId,
       description: description ?? existingStudent?.description ?? "",
       isAlumni: isAlumni ?? existingStudent?.isAlumni ?? false,
       updatedAt: new Date().toISOString(),

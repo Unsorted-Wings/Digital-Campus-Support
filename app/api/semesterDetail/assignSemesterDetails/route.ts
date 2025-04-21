@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { firestore } from "@/lib/firebase/firebaseAdmin"; 
+import { firestore, FieldValue } from "@/lib/firebase/firebaseAdmin";
 import { getToken } from "next-auth/jwt";
 
 export async function POST(req: NextRequest) {
@@ -12,13 +12,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (token.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Admins only" },
+        { status: 403 }
+      );
     }
 
     // 2️⃣ Parse and validate body
-    const { courseId, batchId, subjects, startDate, endDate, mentor } = await req.json();
+    const { courseId, batchId, startDate, endDate, mentor } = await req.json();
 
-    if (!courseId || !batchId || !startDate || !endDate || !mentor || !subjects) {
+    if (!courseId || !batchId || !startDate || !endDate || !mentor) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
@@ -30,7 +33,7 @@ export async function POST(req: NextRequest) {
       id: semesterRef.id,
       courseId,
       batchId,
-      subjects,
+      subjects: [],
       startDate,
       endDate,
       mentor,
@@ -40,9 +43,17 @@ export async function POST(req: NextRequest) {
 
     await semesterRef.set(semesterDetail);
 
-    // 4️⃣ Respond with success
-    return NextResponse.json({ message: "Semester created", semesterDetail }, { status: 201 });
+    const batchRef = firestore.collection("batches").doc(batchId);
+    await batchRef.update({
+      semesters: FieldValue.arrayUnion(semesterRef.id),
+      updatedAt: timestamp,
+    });
 
+    // 4️⃣ Respond with success
+    return NextResponse.json(
+      { message: "Semester created", semesterDetail },
+      { status: 201 }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

@@ -1,7 +1,7 @@
 // app/api/subjects/create/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { firestore } from "@/lib/firebase/firebaseAdmin"; // Ensure this is pointing to your Firestore admin instance
+import { firestore } from "@/lib/firebase/firebaseAdmin"; 
 import { getToken } from "next-auth/jwt";
 
 export async function POST(req: NextRequest) {

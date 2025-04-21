@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModeToggle } from "@/components/ThemeToggle";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { signIn } from "next-auth/react"; // Import NextAuth signIn method
-import { useSession } from "next-auth/react"; // Import useSession hook
+import { signIn } from "next-auth/react"; 
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase/firebaseConfig";
 
 export default function RoleLoginPage({ params }: { params: { role: string } }) {
   const [email, setEmail] = useState("");
@@ -17,38 +17,58 @@ export default function RoleLoginPage({ params }: { params: { role: string } }) 
   const [error, setError] = useState<string | null>(null); // State to store error message
   const router = useRouter();
 
-  const { data: session, status } = useSession(); // Get session data
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null); // Reset error before each login attempt
-
+  
     try {
       // Step 1: NextAuth Authentication - Sign in the user
       const result = await signIn("credentials", {
-        redirect: false, // Prevent automatic redirect
+        redirect: false,
         email,
         password,
       });
-
+  
       if (result?.error) {
         setError("Invalid email or password.");
         return;
       }
-
-      console.log(`Logged in as ${params.role}:`, { email, password });
-
-      // Step 2: Check if the user's role matches the requested role
-      if (session?.user?.role === params.role) {
-        // Redirect to the role-specific dashboard if roles match
-        router.push(`/${params.role}/home`);
-      } else {
-        setError("Access denied.");
+  
+      // Step 2: Get user details from Firestore using their email
+      const userQuery = query(
+        collection(db, "users"),
+        where("email", "==", email)
+      );
+      const userSnapshot = await getDocs(userQuery);
+  
+      if (userSnapshot.empty) {
+        setError("User not found in database.");
+        return;
       }
+  
+      const userDoc = userSnapshot.docs[0];
+      const userData = userDoc.data();
+  
+      // Step 3: Check if role matches
+      if (userData.role !== params.role) {
+        setError("Access denied.");
+        return;
+      }
+  
+      // Step 4: Store user data in localStorage
+      localStorage.setItem("user", JSON.stringify({
+        uid: userDoc.id,
+        email: userData.email,
+        name: userData.name,
+        role: userData.role,
+      }));
+  
+      // Step 5: Redirect to role-specific dashboard
+      router.push(`/${params.role}/home`);
     } catch (err: any) {
-      // Handle any other errors
+      console.error(err);
       setError("An error occurred while logging in.");
-      console.error(err.message);
     }
   };
 
