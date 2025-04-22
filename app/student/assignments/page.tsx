@@ -110,50 +110,10 @@ export default function AssignmentSubmissionPage() {
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
       {/* Header with Filters */}
       <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl">
-        <CardHeader className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <CardHeader className="p-4 gap-4">
           <CardTitle className="text-3xl font-bold text-foreground">
             Assignment Submission
           </CardTitle>
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 border-border">
-                  <Filter className="h-5 w-5" />
-                  Subject: {filterSubject}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
-                {subjects.map((subject) => (
-                  <DropdownMenuItem
-                    key={subject}
-                    onClick={() => setFilterSubject(subject)}
-                    className="hover:bg-primary/10"
-                  >
-                    {subject}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 border-border">
-                  <Filter className="h-5 w-5" />
-                  Status: {filterStatus}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
-                {statuses.map((status) => (
-                  <DropdownMenuItem
-                    key={status}
-                    onClick={() => setFilterStatus(status)}
-                    className="hover:bg-primary/10"
-                  >
-                    {status}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
         </CardHeader>
       </Card>
 
@@ -167,6 +127,46 @@ export default function AssignmentSubmissionPage() {
               <FileText className="h-5 w-5 text-primary" />
               Assignments
             </CardTitle>
+            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2 border-border">
+                    <Filter className="h-5 w-5" />
+                    Subject: {filterSubject}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
+                  {subjects.map((subject) => (
+                    <DropdownMenuItem
+                      key={subject}
+                      onClick={() => setFilterSubject(subject)}
+                      className="hover:bg-primary/10"
+                    >
+                      {subject}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2 border-border">
+                    <Filter className="h-5 w-5" />
+                    Status: {filterStatus}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
+                  {statuses.map((status) => (
+                    <DropdownMenuItem
+                      key={status}
+                      onClick={() => setFilterStatus(status)}
+                      className="hover:bg-primary/10"
+                    >
+                      {status}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </CardHeader>
           <ScrollArea className="flex-1 relative z-10 p-4">
             <Table>

@@ -5,18 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Send, Search, MoreVertical, BarChart2 } from "lucide-react";
+import { Send, Search, MoreVertical, BarChart2, Check, X } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 
 export default function ChatPage() {
   const [selectedChat, setSelectedChat] = useState<number | null>(0);
   const [message, setMessage] = useState("");
-  const [showPollForm, setShowPollForm] = useState(false);
+  const [showPollDialog, setShowPollDialog] = useState(false);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
-  const [polls, setPolls] = useState<{ id: number; question: string; options: { text: string; votes: number }[] }[]>([]);
+  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [pollError, setPollError] = useState("");
 
   // Mock data (replace with real data)
   const chats = [
@@ -26,11 +30,35 @@ export default function ChatPage() {
     { id: 3, name: "CS Club", lastMessage: "Event this Friday!", time: "Monday" },
   ];
 
+  const currentUserId = 1; // Hardcode "You" as user ID 1
+
   const messages = [
-    { id: 1, sender: "You", text: "Hey everyone, ready for the quiz?", time: "12:25 PM", isSent: true },
-    { id: 2, sender: "Mike", text: "Yeah, just reviewing now!", time: "12:26 PM", isSent: false },
-    { id: 3, sender: "You", text: "Cool, see you at 2!", time: "12:30 PM", isSent: true },
-    { id: 4, sender: "Prof. Smith", text: "Check the Calculus notes here: /docs/math-lecture.pdf", time: "10:15 AM", isSent: false },
+    { id: 1, type: "message", sender: "You", senderId: 1, text: "Hey everyone, ready for the quiz?", time: "12:25 PM", isSent: true },
+    { id: 2, type: "message", sender: "Mike", senderId: 2, text: "Yeah, just reviewing now!", time: "12:26 PM", isSent: false },
+    { id: 3, type: "message", sender: "You", senderId: 1, text: "Cool, see you at 2!", time: "12:30 PM", isSent: true },
+    {
+      id: 4,
+      type: "poll",
+      sender: "You",
+      senderId: 1,
+      time: "12:35 PM",
+      isSent: true,
+      poll: {
+        id: 1,
+        question: "What time for the study session?",
+        options: [
+          { text: "2 PM", votes: 2 },
+          { text: "4 PM", votes: 1 },
+        ],
+        allowMultiple: false,
+        votes: [
+          { userId: 1, optionIdx: 0 },
+          { userId: 2, optionIdx: 0 },
+          { userId: 3, optionIdx: 1 },
+        ],
+      },
+    },
+    { id: 5, type: "message", sender: "Prof. Smith", senderId: 4, text: "Check the Calculus notes here: /docs/math-lecture.pdf", time: "10:15 AM", isSent: false },
   ];
 
   const handleSend = () => {
@@ -41,35 +69,58 @@ export default function ChatPage() {
   };
 
   const handleCreatePoll = () => {
-    if (pollQuestion.trim() && pollOptions.every((opt) => opt.trim())) {
-      setPolls([
-        ...polls,
-        {
-          id: polls.length + 1,
-          question: pollQuestion,
-          options: pollOptions.map((opt) => ({ text: opt, votes: 0 })),
-        },
-      ]);
-      setPollQuestion("");
-      setPollOptions(["", ""]);
-      setShowPollForm(false);
-      console.log("Poll created:", { question: pollQuestion, options: pollOptions });
+    if (!pollQuestion.trim()) {
+      setPollError("Poll question is required.");
+      return;
     }
+    if (pollOptions.length < 2 || pollOptions.some((opt) => !opt.trim())) {
+      setPollError("At least two non-empty options are required.");
+      return;
+    }
+    const newPoll = {
+      id: messages.length + 1,
+      type: "poll",
+      sender: "You",
+      senderId: currentUserId,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      isSent: true,
+      poll: {
+        id: messages.filter((m) => m.type === "poll").length + 1,
+        question: pollQuestion,
+        options: pollOptions.map((opt) => ({ text: opt, votes: 0 })),
+        allowMultiple,
+        votes: [],
+      },
+    };
+    messages.push(newPoll); // Update messages array (use state in production)
+    setPollQuestion("");
+    setPollOptions(["", ""]);
+    setAllowMultiple(false);
+    setShowPollDialog(false);
+    setPollError("");
+    console.log("Poll created:", newPoll);
   };
 
   const handleVote = (pollId: number, optionIdx: number) => {
-    setPolls((prevPolls) =>
-      prevPolls.map((poll) =>
-        poll.id === pollId
-          ? {
-              ...poll,
-              options: poll.options.map((opt, idx) =>
-                idx === optionIdx ? { ...opt, votes: opt.votes + 1 } : opt
-              ),
-            }
-          : poll
-      )
-    );
+    const pollMsg = messages.find((m) => m.type === "poll" && m.poll?.id === pollId);
+    if (!pollMsg || pollMsg.type !== "poll") return;
+
+    const existingVote = pollMsg.poll?.votes.find((v) => v.userId === currentUserId);
+    if (pollMsg.poll && !pollMsg.poll.allowMultiple && existingVote) {
+      // Remove existing vote
+      pollMsg.poll.votes = pollMsg.poll?.votes.filter((v) => v.userId !== currentUserId);
+      pollMsg.poll.options[existingVote.optionIdx].votes -= 1;
+    }
+
+    // Add new vote
+    pollMsg.poll?.votes.push({ userId: currentUserId, optionIdx });
+    if (pollMsg.poll && pollMsg.poll.options[optionIdx]) {
+      pollMsg.poll.options[optionIdx].votes += 1;
+    }
+
+    // Trigger re-render (use state in production)
+    messages[messages.indexOf(pollMsg)] = { ...pollMsg };
+    console.log("Voted:", { pollId, optionIdx, userId: currentUserId });
   };
 
   const renderMessageContent = (text: string) => {
@@ -147,87 +198,161 @@ export default function ChatPage() {
               <CardTitle className="text-xl font-semibold text-foreground">
                 {chats[selectedChat].name}
               </CardTitle>
+            </div>
             <Button
               variant="ghost"
               className="text-foreground hover:bg-primary/10 p-2 rounded-full"
             >
               <MoreVertical className="h-5 w-5" />
             </Button>
-            </div>
           </CardHeader>
           <ScrollArea className="flex-1 p-6 relative z-10">
             <div className="space-y-4">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "flex items-end gap-2",
-                    msg.isSent ? "justify-end" : "justify-start"
-                  )}
-                >
-                  {!msg.isSent && (
-                    <Avatar className="w-8 h-8 flex-shrink-0">
-                      <AvatarImage src={`/user-${msg.sender}.jpg`} alt={msg.sender} />
-                      <AvatarFallback className="bg-primary/20 text-primary">
-                        {msg.sender.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
+              {messages
+                .filter((msg) => msg.id <= 4 || chats[selectedChat].name === "Study Group") // Simulate group-specific polls
+                .map((msg) => (
                   <div
+                    key={msg.id}
                     className={cn(
-                      "max-w-[70%] p-3 rounded-lg shadow-md transition-all duration-300 hover:shadow-lg",
-                      msg.isSent
-                        ? "bg-primary text-primary-foreground rounded-br-none"
-                        : "bg-muted/70 text-foreground rounded-bl-none"
+                      "flex items-end gap-2",
+                      msg.isSent ? "justify-end" : "justify-start"
                     )}
                   >
-                    <p className="text-xs font-medium text-opacity-80">
-                      {msg.sender}
-                    </p>
-                    <p className="text-sm mt-1">{renderMessageContent(msg.text)}</p>
-                    <p className="text-xs mt-1 text-right">
-                      {msg.time}
-                    </p>
-                  </div>
-                  {msg.isSent && (
-                    <Avatar className="w-8 h-8 flex-shrink-0">
-                      <AvatarImage src="/user-you.jpg" alt="You" />
-                      <AvatarFallback className="bg-primary/20 text-primary">Y</AvatarFallback>
-                    </Avatar>
-                  )}
-                </div>
-              ))}
-              {polls.map((poll) => (
-                <div key={poll.id} className="max-w-[70%] mx-auto p-4 bg-card rounded-lg shadow-md border border-border">
-                  <p className="text-sm font-semibold text-foreground">{poll.question}</p>
-                  <div className="mt-3 space-y-2">
-                    {poll.options.map((opt, idx) => (
+                    {!msg.isSent && (
+                      <Avatar className="w-8 h-8 flex-shrink-0">
+                        <AvatarImage src={`/user-${msg.sender}.jpg`} alt={msg.sender} />
+                        <AvatarFallback className="bg-primary/20 text-primary">
+                          {msg.sender.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    {msg.type === "message" ? (
                       <div
-                        key={idx}
-                        className="flex items-center justify-between p-2 bg-muted/50 rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-200"
-                        onClick={() => handleVote(poll.id, idx)}
+                        className={cn(
+                          "max-w-[70%] p-3 rounded-lg shadow-md transition-all duration-300 hover:shadow-lg",
+                          msg.isSent
+                            ? "bg-primary text-primary-foreground rounded-br-none"
+                            : "bg-muted/70 text-foreground rounded-bl-none"
+                        )}
                       >
-                        <span className="text-sm text-foreground">{opt.text}</span>
-                        <span className="text-xs text-muted-foreground">{opt.votes} votes</span>
+                        <p className="text-xs font-medium text-opacity-80">
+                          {msg.sender}
+                        </p>
+                        <p className="text-sm mt-1">{renderMessageContent(msg.text || "")}</p>
+                        <p className="text-xs mt-1 text-right">
+                          {msg.time}
+                        </p>
                       </div>
-                    ))}
+                    ) : (
+                      <div
+                        className={cn(
+                          "max-w-[70%] p-4 rounded-lg shadow-md transition-all duration-300 hover:shadow-lg",
+                          msg.isSent
+                            ? "bg-primary/10 text-foreground rounded-br-none"
+                            : "bg-muted/70 text-foreground rounded-bl-none"
+                        )}
+                      >
+                        <p className="text-xs font-medium text-opacity-80">{msg.sender}</p>
+                        <p className="text-sm font-semibold mt-1">{msg.poll?.question}</p>
+                        <div className="mt-3 space-y-2">
+                          {msg.poll?.options.map((opt, idx) => {
+                            const totalVotes = msg.poll?.options.reduce((sum, o) => sum + o.votes, 0);
+                            const percentage = totalVotes ? (opt.votes / totalVotes) * 100 : 0;
+                            const userVoted = msg.poll?.votes.some(
+                              (v) => v.userId === currentUserId && v.optionIdx === idx
+                            );
+                            return (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-2 p-2 bg-muted/50 rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-200"
+                                onClick={() => handleVote(msg.poll.id, idx)}
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-foreground">
+                                      {idx + 1}. {opt.text}
+                                    </span>
+                                    {userVoted && <Check className="h-4 w-4 text-primary" />}
+                                  </div>
+                                  <div className="w-full bg-muted/30 h-1.5 rounded-full mt-1">
+                                    <div
+                                      className="bg-primary/20 h-1.5 rounded-full"
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+                                </div>
+                                <span className="text-xs text-muted-foreground">{opt.votes} votes</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs mt-2 text-right text-muted-foreground">{msg.time}</p>
+                      </div>
+                    )}
+                    {msg.isSent && (
+                      <Avatar className="w-8 h-8 flex-shrink-0">
+                        <AvatarImage src="/user-you.jpg" alt="You" />
+                        <AvatarFallback className="bg-primary/20 text-primary">Y</AvatarFallback>
+                      </Avatar>
+                    )}
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </ScrollArea>
           <CardContent className="p-4 border-t border-border bg-card/95 relative z-10">
-            {showPollForm ? (
-              <div className="space-y-4">
-                <Input
-                  value={pollQuestion}
-                  onChange={(e) => setPollQuestion(e.target.value)}
-                  placeholder="Poll question"
-                  className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
-                />
-                {pollOptions.map((opt, idx) => (
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => setShowPollDialog(true)}
+                className="text-foreground hover:bg-primary/10 p-2 rounded-full"
+              >
+                <BarChart2 className="h-5 w-5" />
+              </Button>
+              <Input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-xl"
+                onKeyPress={(e) => e.key === "Enter" && handleSend()}
+              />
+              <Button
+                onClick={handleSend}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl p-2"
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          Select a chat to start messaging
+        </div>
+      )}
+
+      {/* Poll Creation Dialog */}
+      <Dialog open={showPollDialog} onOpenChange={setShowPollDialog}>
+        <DialogContent className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Create Poll</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 p-4">
+            {pollError && <p className="text-destructive text-sm">{pollError}</p>}
+            <div>
+              <Label htmlFor="pollQuestion" className="text-foreground">Question</Label>
+              <Input
+                id="pollQuestion"
+                value={pollQuestion}
+                onChange={(e) => setPollQuestion(e.target.value)}
+                placeholder="Ask a question..."
+                className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
+              />
+            </div>
+            <div>
+              <Label className="text-foreground">Options</Label>
+              {pollOptions.map((opt, idx) => (
+                <div key={idx} className="flex items-center gap-2 mt-2">
                   <Input
-                    key={idx}
                     value={opt}
                     onChange={(e) => {
                       const newOptions = [...pollOptions];
@@ -237,54 +362,51 @@ export default function ChatPage() {
                     placeholder={`Option ${idx + 1}`}
                     className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
                   />
-                ))}
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setPollOptions([...pollOptions, ""])}
-                    variant="outline"
-                    className="flex-1 border-border text-foreground hover:bg-primary/10"
-                  >
-                    Add Option
-                  </Button>
-                  <Button
-                    onClick={handleCreatePoll}
-                    className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg"
-                  >
-                    Create Poll
-                  </Button>
+                  {pollOptions.length > 2 && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                      className="text-destructive hover:bg-destructive/10 p-2"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowPollForm(true)}
-                  className="text-foreground hover:bg-primary/10 p-2 rounded-full"
-                >
-                  <BarChart2 className="h-5 w-5" />
-                </Button>
-                <Input
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1 bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-xl"
-                  onKeyPress={(e) => e.key === "Enter" && handleSend()}
-                />
-                <Button
-                  onClick={handleSend}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl p-2"
-                >
-                  <Send className="h-5 w-5" />
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          Select a chat to start messaging
-        </div>
-      )}
+              ))}
+              <Button
+                onClick={() => setPollOptions([...pollOptions, ""])}
+                variant="outline"
+                className="mt-2 w-full border-border text-foreground hover:bg-primary/10"
+              >
+                Add Option
+              </Button>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="allowMultiple" className="text-foreground">Allow multiple answers</Label>
+              <Switch
+                id="allowMultiple"
+                checked={allowMultiple}
+                onCheckedChange={setAllowMultiple}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowPollDialog(false)}
+                className="border-border text-foreground hover:bg-primary/10"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreatePoll}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Create
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

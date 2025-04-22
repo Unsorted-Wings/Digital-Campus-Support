@@ -3,9 +3,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Star, MessageSquare } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Star, MessageSquare, HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { Toast } from "@/components/ui/toast"; // Mock toast import
+import { toast } from "@/hooks/use-toast";
 
 interface Faculty {
   id: number;
@@ -69,9 +74,17 @@ export default function StudentFacultyReviewPage() {
     supportiveness: 0,
   });
   const [error, setError] = useState<string>("");
+  const [isReviewsOpen, setIsReviewsOpen] = useState(false);
+
+  const ratingLabels = ["Poor", "Fair", "Good", "Very Good", "Excellent"];
 
   const handleRatingChange = (question: keyof typeof ratings, value: number) => {
     setRatings((prev) => ({ ...prev, [question]: value }));
+  };
+
+  const handleCourseChange = (value: string) => {
+    setSelectedCourse(value);
+    setSelectedSubject("");
   };
 
   const handleSubmit = () => {
@@ -80,10 +93,7 @@ export default function StudentFacultyReviewPage() {
       return;
     }
 
-    // Mock student ID (replace with real user context, e.g., from next-auth)
-    const studentId = 1;
-
-    // Check for duplicate review (mock; implement via backend)
+    const studentId = 1; // Mock; use auth context
     const duplicate = reviews.some(
       (r) =>
         r.studentId === studentId &&
@@ -111,7 +121,10 @@ export default function StudentFacultyReviewPage() {
     };
 
     setReviews((prev) => [...prev, newReview]);
-    console.log("Submitted review:", newReview);
+    toast({
+      title: "Review Submitted",
+      description: "Your faculty review has been recorded.",
+    });
     setSelectedFaculty("");
     setSelectedCourse("");
     setSelectedSubject("");
@@ -129,138 +142,280 @@ export default function StudentFacultyReviewPage() {
 
   const renderStars = (question: keyof typeof ratings, currentRating: number) => {
     return (
-      <div className="flex items-center gap-1">
-        {[...Array(5)].map((_, i) => (
-          <Star
-            key={i}
-            className={cn(
-              "h-6 w-6 cursor-pointer transition-all duration-300",
-              i < currentRating ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground",
-              "hover:scale-110"
-            )}
-            onClick={() => handleRatingChange(question, i + 1)}
-          />
-        ))}
+      <div className="flex gap-2">
+        <div
+          role="radiogroup"
+          aria-label={`Rate ${question}, ${currentRating} stars`}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowRight" && currentRating < 5) handleRatingChange(question, currentRating + 1);
+            if (e.key === "ArrowLeft" && currentRating > 0) handleRatingChange(question, currentRating - 1);
+          }}
+          className="flex items-center gap-2"
+          tabIndex={0}
+        >
+          {[...Array(5)].map((_, i) => (
+            <span title={ratingLabels[i]}>
+              <Star
+                key={i}
+                className={cn(
+                  "h-6 w-6 cursor-pointer transition-all duration-300",
+                  i < currentRating ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground",
+                  "hover:scale-110"
+                )}
+                onClick={() => handleRatingChange(question, i + 1)}
+              />
+            </span>
+          ))}
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {currentRating > 0 ? `${currentRating}/5 (${ratingLabels[currentRating - 1]})` : ""}
+        </span>
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6">
       {/* Header */}
-      <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
+      <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
         <CardHeader className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
           <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />
-            Rate Faculty
+            {selectedFaculty && selectedCourse
+              ? `Rate ${facultyList.find((f) => f.id === parseInt(selectedFaculty))?.name} for ${selectedCourse}`
+              : "Rate Faculty"}
           </CardTitle>
-          <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-full shadow-sm">
-            {/* Placeholder for future actions */}
-          </div>
+          <Button
+            variant="outline"
+            className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-full p-2"
+            aria-label="Help"
+            onClick={() => alert("Submit a review to rate faculty on teaching style, cooperation, clarity, engagement, and supportiveness.")}
+          >
+            <HelpCircle className="h-5 w-5" />
+          </Button>
         </CardHeader>
       </Card>
-
+      
+      <div className="grid grid-cols-2 gap-6">
       {/* Review Form */}
-      <Card className="flex-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
+      <Card className="flex-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden h-full min-h-0">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-        <CardContent className="p-6 relative z-10 flex items-center justify-center">
-          <Card className="bg-muted/50 p-6 rounded-lg w-full max-w-lg">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Submit Faculty Review</h3>
-            {error && <p className="text-destructive text-sm mb-4">{error}</p>}
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm text-muted-foreground">Faculty</label>
-                <Select value={selectedFaculty} onValueChange={setSelectedFaculty}>
-                  <SelectTrigger className="w-full bg-muted/50 border-border rounded-lg">
-                    <SelectValue placeholder="Select faculty" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {facultyList.map((faculty) => (
-                      <SelectItem key={faculty.id} value={faculty.id.toString()}>
-                        {faculty.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground">Course</label>
-                <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-                  <SelectTrigger className="w-full bg-muted/50 border-border rounded-lg">
-                    <SelectValue placeholder="Select course" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses.map((course) => (
-                      <SelectItem key={course.name} value={course.name}>
-                        {course.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground">Subject</label>
-                <Select
-                  value={selectedSubject}
-                  onValueChange={setSelectedSubject}
-                  disabled={!selectedCourse}
-                >
-                  <SelectTrigger className="w-full bg-muted/50 border-border rounded-lg">
-                    <SelectValue placeholder="Select subject" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses
-                      .find((course) => course.name === selectedCourse)
-                      ?.subjects.map((subject) => (
-                        <SelectItem key={subject.name} value={subject.name}>
-                          {subject.name}
+        <CardContent className="p-4 flex flex-col h-full min-h-0">
+          <ScrollArea className="h-full w-full">
+            <Card className="bg-muted/50 p-6 rounded-lg w-full max-w-lg mx-auto min-h-fit">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Submit Faculty Review</h3>
+              {error && (
+                <p className="text-destructive text-sm mb-4 bg-destructive/10 p-2 rounded shadow-sm">
+                  {error}
+                </p>
+              )}
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="faculty" className="text-sm text-foreground font-medium">
+                    Faculty
+                  </Label>
+                  <Select
+                    value={selectedFaculty}
+                    onValueChange={setSelectedFaculty}
+                    aria-label="Select faculty"
+                  >
+                    <SelectTrigger
+                      id="faculty"
+                      className="w-full bg-primary/5 border-border rounded-xl focus:ring-primary"
+                    >
+                      <SelectValue placeholder="Select faculty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {facultyList.map((faculty) => (
+                        <SelectItem key={faculty.id} value={faculty.id.toString()}>
+                          {faculty.name}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="course" className="text-sm text-foreground font-medium">
+                    Course
+                  </Label>
+                  <Select
+                    value={selectedCourse}
+                    onValueChange={handleCourseChange}
+                    aria-label="Select course"
+                  >
+                    <SelectTrigger
+                      id="course"
+                      className="w-full bg-primary/5 border-border rounded-xl focus:ring-primary"
+                    >
+                      <SelectValue placeholder="Select course" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {courses.map((course) => (
+                        <SelectItem key={course.name} value={course.name}>
+                          {course.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="subject" className="text-sm text-foreground font-medium">
+                    Subject
+                  </Label>
+                  <Select
+                    value={selectedSubject}
+                    onValueChange={setSelectedSubject}
+                    disabled={!selectedCourse}
+                    aria-label="Select subject"
+                  >
+                    <SelectTrigger
+                      id="subject"
+                      className="w-full bg-primary/5 border-border rounded-xl focus:ring-primary"
+                    >
+                      <SelectValue placeholder="Select subject" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {courses
+                        .find((course) => course.name === selectedCourse)
+                        ?.subjects.map((subject) => (
+                          <SelectItem key={subject.name} value={subject.name}>
+                            {subject.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-sm text-foreground font-medium">Teaching Style</Label>
+                    {renderStars("teachingStyle", ratings.teachingStyle)}
+                  </div>
+                  <div>
+                    <Label className="text-sm text-foreground font-medium">Cooperation</Label>
+                    {renderStars("cooperation", ratings.cooperation)}
+                  </div>
+                  <div>
+                    <Label className="text-sm text-foreground font-medium">Clarity</Label>
+                    {renderStars("clarity", ratings.clarity)}
+                  </div>
+                  <div>
+                    <Label className="text-sm text-foreground font-medium">Engagement</Label>
+                    {renderStars("engagement", ratings.engagement)}
+                  </div>
+                  <div>
+                    <Label className="text-sm text-foreground font-medium">Supportiveness</Label>
+                    {renderStars("supportiveness", ratings.supportiveness)}
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <Button
+                    onClick={handleSubmit}
+                    className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full shadow-md hover:shadow-lg transition-all duration-300"
+                    aria-label="Submit review"
+                  >
+                    Submit Review
+                  </Button>
+                  <Button
+                    onClick={handleClear}
+                    variant="outline"
+                    className="flex-1 bg-primary/10 border-border text-foreground hover:bg-primary/20 rounded-full"
+                    aria-label="Clear form"
+                  >
+                    Clear
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm text-muted-foreground">Teaching Style</label>
-                  {renderStars("teachingStyle", ratings.teachingStyle)}
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Cooperation</label>
-                  {renderStars("cooperation", ratings.cooperation)}
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Clarity</label>
-                  {renderStars("clarity", ratings.clarity)}
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Engagement</label>
-                  {renderStars("engagement", ratings.engagement)}
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Supportiveness</label>
-                  {renderStars("supportiveness", ratings.supportiveness)}
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <Button
-                  onClick={handleSubmit}
-                  className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-                >
-                  Submit Review
-                </Button>
-                <Button
-                  onClick={handleClear}
-                  variant="outline"
-                  className="flex-1 border-border text-foreground hover:bg-primary/10 rounded-lg"
-                >
-                  Clear
-                </Button>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Past Reviews */}
+      <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
+        <CardContent className="p-4">
+          <Collapsible
+            open={isReviewsOpen}
+            onOpenChange={setIsReviewsOpen}
+            className="w-full max-w-lg mx-auto"
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full bg-primary/10 text-foreground hover:bg-primary/20 rounded-lg flex items-center justify-between"
+              >
+                <span>Past Reviews ({reviews.length})</span>
+                {isReviewsOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 mt-4">
+              {reviews.length > 0 ? (
+                reviews.map((review) => (
+                  <Card
+                    key={review.id}
+                    className="bg-card shadow-sm rounded-lg transition-all duration-300 hover:shadow-md"
+                  >
+                    <CardContent className="p-4">
+                      <p className="text-sm font-medium text-foreground">
+                        {facultyList.find((f) => f.id === review.facultyId)?.name} - {review.course} ({review.subject})
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium">Teaching Style:</span> {review.teachingStyle}/5
+                          <span className="flex">
+                            {[...Array(review.teachingStyle)].map((_, i) => (
+                              <Star key={i} className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                            ))}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium">Cooperation:</span> {review.cooperation}/5
+                          <span className="flex">
+                            {[...Array(review.cooperation)].map((_, i) => (
+                              <Star key={i} className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                            ))}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium">Clarity:</span> {review.clarity}/5
+                          <span className="flex">
+                            {[...Array(review.clarity)].map((_, i) => (
+                              <Star key={i} className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                            ))}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium">Engagement:</span> {review.engagement}/5
+                          <span className="flex">
+                            {[...Array(review.engagement)].map((_, i) => (
+                              <Star key={i} className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                            ))}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium">Supportiveness:</span> {review.supportiveness}/5
+                          <span className="flex">
+                            {[...Array(review.supportiveness)].map((_, i) => (
+                              <Star key={i} className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                            ))}
+                          </span>
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        <span className="font-medium">Date:</span> {review.date}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground py-4">No reviews submitted yet.</p>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </CardContent>
+      </Card>
+      </div>
     </div>
   );
 }

@@ -3,8 +3,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus } from "lucide-react";
 import { useState } from "react";
 import {
   format,
@@ -21,20 +26,27 @@ import {
   eachDayOfInterval,
   isSameDay,
   isToday,
-  startOfDay,
 } from "date-fns";
 
 export default function SchedulePage() {
   const [view, setView] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [currentDate, setCurrentDate] = useState(new Date());
-
-  // Mock data (replace with real data from backend)
-  const events = [
+  const [events, setEvents] = useState([
     { id: 1, title: "Math Lecture", start: new Date(2025, 3, 7, 10, 0), end: new Date(2025, 3, 7, 11, 30), subject: "Mathematics" },
     { id: 2, title: "Physics Lab", start: new Date(2025, 3, 8, 14, 0), end: new Date(2025, 3, 8, 16, 0), subject: "Physics" },
     { id: 3, title: "CS Assignment Due", start: new Date(2025, 3, 10, 23, 59), end: new Date(2025, 3, 10, 23, 59), subject: "Computer Science" },
     { id: 4, title: "Study Group", start: new Date(2025, 3, 9, 15, 0), end: new Date(2025, 3, 9, 16, 30), subject: "General" },
-  ];
+  ]);
+  const [showAddEvent, setShowAddEvent] = useState(false);
+  const [newEvent, setNewEvent] = useState({
+    title: "",
+    start: "",
+    end: "",
+    subject: "",
+  });
+  const [eventError, setEventError] = useState("");
+
+  const subjects = ["Mathematics", "Physics", "Computer Science", "General"];
 
   const navigate = (direction: "prev" | "next") => {
     switch (view) {
@@ -50,54 +62,95 @@ export default function SchedulePage() {
     }
   };
 
+  const getDateDisplay = () => {
+    if (view === "daily") return format(currentDate, "MMMM d, yyyy");
+    if (view === "weekly") {
+      const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+      return `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`;
+    }
+    return format(currentDate, "MMMM yyyy");
+  };
+
+  const handleAddEvent = () => {
+    if (!newEvent.title.trim()) {
+      setEventError("Event title is required.");
+      return;
+    }
+    if (!newEvent.start || !newEvent.end) {
+      setEventError("Start and end times are required.");
+      return;
+    }
+    const startDate = new Date(newEvent.start);
+    const endDate = new Date(newEvent.end);
+    if (startDate > endDate) {
+      setEventError("End time must be after start time.");
+      return;
+    }
+    if (!newEvent.subject) {
+      setEventError("Subject is required.");
+      return;
+    }
+    const newEventData = {
+      id: events.length + 1,
+      title: newEvent.title,
+      start: startDate,
+      end: endDate,
+      subject: newEvent.subject,
+    };
+    setEvents([...events, newEventData]);
+    setNewEvent({ title: "", start: "", end: "", subject: "" });
+    setShowAddEvent(false);
+    setEventError("");
+    console.log("Added event:", newEventData);
+  };
+
   const renderDailyView = () => {
     const hours = Array.from({ length: 24 }, (_, i) => i);
     const dayEvents = events.filter((event) => isSameDay(event.start, currentDate));
 
     return (
-      <div className="flex flex-col h-[calc(100%-2rem)]">
+      <ScrollArea className="h-full">
         <div className="grid grid-cols-[80px_1fr] border-b border-border/50 bg-muted/50 p-2">
           <div className="text-center text-muted-foreground font-medium">Time</div>
           <div className="text-center text-muted-foreground font-medium">
             {format(currentDate, "EEEE, MMMM d")}
           </div>
         </div>
-        <div className="relative flex-1 overflow-auto">
-          <div className="grid grid-cols-[80px_1fr] gap-2">
-            <div className="flex flex-col text-muted-foreground text-xs">
-              {hours.map((hour) => (
-                <div key={hour} className="h-16 flex items-center justify-end pr-3 border-b border-border/50">
-                  {format(new Date().setHours(hour, 0), "h a")}
+        <div className="grid grid-cols-[80px_1fr] gap-2">
+          <div className="flex flex-col text-muted-foreground text-xs">
+            {hours.map((hour) => (
+              <div key={hour} className="h-16 flex items-center justify-end pr-3 border-b border-border/50">
+                {format(new Date().setHours(hour, 0), "h a")}
+              </div>
+            ))}
+          </div>
+          <div className="relative">
+            {hours.map((hour) => (
+              <div key={hour} className="h-16 border-b border-border/50 bg-background/50" />
+            ))}
+            {dayEvents.map((event) => {
+              const startHour = event.start.getHours() + event.start.getMinutes() / 60;
+              const duration = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60);
+              return (
+                <div
+                  key={event.id}
+                  className="absolute left-1 right-1 p-2 bg-gradient-to-br from-primary to-primary/70 text-primary-foreground rounded-lg shadow-md hover:shadow-lg transition-all duration-300 border-l-4 border-primary/80"
+                  style={{
+                    top: `${startHour * 64}px`,
+                    height: `${duration * 64}px`,
+                  }}
+                >
+                  <p className="text-sm font-semibold">{event.title}</p>
+                  <p className="text-xs flex items-center gap-1">
+                    <Clock className="h-3 w-3" /> {format(event.start, "h:mm a")} - {format(event.end, "h:mm a")}
+                  </p>
                 </div>
-              ))}
-            </div>
-            <div className="relative">
-              {hours.map((hour) => (
-                <div key={hour} className="h-16 border-b border-border/50 bg-background/50" />
-              ))}
-              {dayEvents.map((event) => {
-                const startHour = event.start.getHours() + event.start.getMinutes() / 60;
-                const duration = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60);
-                return (
-                  <div
-                    key={event.id}
-                    className="absolute left-1 right-1 p-2 bg-gradient-to-br from-primary to-primary/70 text-primary-foreground rounded-lg shadow-md hover:shadow-lg transition-all duration-300 border-l-4 border-primary/80"
-                    style={{
-                      top: `${startHour * 64}px`,
-                      height: `${duration * 64}px`,
-                    }}
-                  >
-                    <p className="text-sm font-semibold">{event.title}</p>
-                    <p className="text-xs flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> {format(event.start, "h:mm a")} - {format(event.end, "h:mm a")}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
+              );
+            })}
           </div>
         </div>
-      </div>
+      </ScrollArea>
     );
   };
 
@@ -106,7 +159,7 @@ export default function SchedulePage() {
     const weekDays = eachDayOfInterval({ start: weekStart, end: endOfWeek(weekStart, { weekStartsOn: 1 }) });
 
     return (
-      <div className="flex flex-col h-[calc(100%-2rem)]">
+      <ScrollArea className="h-full">
         <div className="grid grid-cols-8 gap-1 border-b border-border/50 bg-muted/50 p-2">
           <div className="text-center text-muted-foreground font-medium">Time</div>
           {weekDays.map((day) => (
@@ -115,45 +168,43 @@ export default function SchedulePage() {
             </div>
           ))}
         </div>
-        <div className="relative flex-1 overflow-auto">
-          <div className="grid grid-cols-8 gap-1">
-            <div className="flex flex-col text-muted-foreground text-xs">
-              {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
-                <div key={hour} className="h-16 flex items-center justify-end pr-3 border-b border-border/50">
-                  {format(new Date().setHours(hour, 0), "h a")}
-                </div>
-              ))}
-            </div>
-            {weekDays.map((day) => {
-              const dayEvents = events.filter((event) => isSameDay(event.start, day));
-              return (
-                <div key={day.toString()} className="relative border-l border-border/50">
-                  {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
-                    <div key={hour} className="h-16 border-b border-border/50 bg-background/50" />
-                  ))}
-                  {dayEvents.map((event) => {
-                    const startHour = event.start.getHours() + event.start.getMinutes() / 60;
-                    const duration = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60);
-                    return (
-                      <div
-                        key={event.id}
-                        className="absolute left-0.5 right-0.5 p-1 bg-gradient-to-br from-primary to-primary/70 text-primary-foreground rounded-md shadow-md hover:shadow-lg transition-all duration-300 border-l-2 border-primary/80"
-                        style={{
-                          top: `${startHour * 64}px`,
-                          height: `${duration * 64}px`,
-                        }}
-                      >
-                        <p className="text-xs font-semibold truncate">{event.title}</p>
-                        <p className="text-xs truncate">{format(event.start, "h:mm a")}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+        <div className="grid grid-cols-8 gap-1">
+          <div className="flex flex-col text-muted-foreground text-xs">
+            {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+              <div key={hour} className="h-16 flex items-center justify-end pr-3 border-b border-border/50">
+                {format(new Date().setHours(hour, 0), "h a")}
+              </div>
+            ))}
           </div>
+          {weekDays.map((day) => {
+            const dayEvents = events.filter((event) => isSameDay(event.start, day));
+            return (
+              <div key={day.toString()} className="relative border-l border-border/50">
+                {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                  <div key={hour} className="h-16 border-b border-border/50 bg-background/50" />
+                ))}
+                {dayEvents.map((event) => {
+                  const startHour = event.start.getHours() + event.start.getMinutes() / 60;
+                  const duration = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60);
+                  return (
+                    <div
+                      key={event.id}
+                      className="absolute left-0.5 right-0.5 p-1 bg-gradient-to-br from-primary to-primary/70 text-primary-foreground rounded-md shadow-md hover:shadow-lg transition-all duration-300 border-l-2 border-primary/80"
+                      style={{
+                        top: `${startHour * 64}px`,
+                        height: `${duration * 64}px`,
+                      }}
+                    >
+                      <p className="text-xs font-semibold truncate">{event.title}</p>
+                      <p className="text-xs truncate">{format(event.start, "h:mm a")}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
-      </div>
+      </ScrollArea>
     );
   };
 
@@ -170,7 +221,7 @@ export default function SchedulePage() {
     while (paddedDays.length < totalCells) paddedDays.push(null);
 
     return (
-      <div className="grid grid-cols-7 gap-2 h-[calc(100%-2rem)]">
+      <div className="grid grid-cols-7 gap-2 h-full">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
           <div key={day} className="text-center text-foreground font-semibold p-2 bg-muted/50 rounded-t-lg">
             {day}
@@ -215,32 +266,42 @@ export default function SchedulePage() {
       {/* Header */}
       <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-        <CardHeader className="p-4 flex items-center justify-between relative z-10">
-          <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <CalendarIcon className="h-6 w-6 text-primary" />
-            Schedule
-          </CardTitle>
+        <CardHeader className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
           <div className="flex items-center gap-3">
+            <CalendarIcon className="h-6 w-6 text-primary" />
+            <div>
+              <CardTitle className="text-2xl font-bold text-foreground">Schedule</CardTitle>
+              <p className="text-sm text-muted-foreground">{getDateDisplay()}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
               onClick={() => setCurrentDate(new Date())}
-              className="border-border text-foreground hover:bg-primary/10"
+              className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-full"
             >
               Today
             </Button>
             <Button
               variant="outline"
               onClick={() => navigate("prev")}
-              className="border-border text-foreground hover:bg-primary/10"
+              className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-full px-2"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <Button
               variant="outline"
               onClick={() => navigate("next")}
-              className="border-border text-foreground hover:bg-primary/10"
+              className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-full px-2"
             >
               <ChevronRight className="h-5 w-5" />
+            </Button>
+            <Button
+              onClick={() => setShowAddEvent(true)}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Add Event
             </Button>
           </div>
         </CardHeader>
@@ -270,19 +331,94 @@ export default function SchedulePage() {
               Monthly
             </TabsTrigger>
           </TabsList>
-          <CardContent className="flex-1 p-6 overflow-auto">
-            <TabsContent value="daily" className="h-full">
+          <CardContent className="flex-1 p-6">
+            <TabsContent value="daily" className="h-full m-0">
               {renderDailyView()}
             </TabsContent>
-            <TabsContent value="weekly" className="h-full">
+            <TabsContent value="weekly" className="h-full m-0">
               {renderWeeklyView()}
             </TabsContent>
-            <TabsContent value="monthly" className="h-full">
+            <TabsContent value="monthly" className="h-full m-0">
               {renderMonthlyView()}
             </TabsContent>
           </CardContent>
         </Tabs>
       </Card>
+
+      {/* Add Event Dialog */}
+      <Dialog open={showAddEvent} onOpenChange={setShowAddEvent}>
+        <DialogContent className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Add New Event</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 p-4">
+            {eventError && <p className="text-destructive text-sm">{eventError}</p>}
+            <div>
+              <Label htmlFor="title" className="text-foreground">Title</Label>
+              <Input
+                id="title"
+                value={newEvent.title}
+                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                placeholder="Event title"
+                className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
+              />
+            </div>
+            <div>
+              <Label htmlFor="start" className="text-foreground">Start Time</Label>
+              <Input
+                id="start"
+                type="datetime-local"
+                value={newEvent.start}
+                onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
+                className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
+              />
+            </div>
+            <div>
+              <Label htmlFor="end" className="text-foreground">End Time</Label>
+              <Input
+                id="end"
+                type="datetime-local"
+                value={newEvent.end}
+                onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value })}
+                className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
+              />
+            </div>
+            <div>
+              <Label htmlFor="subject" className="text-foreground">Subject</Label>
+              <Select
+                value={newEvent.subject}
+                onValueChange={(value) => setNewEvent({ ...newEvent, subject: value })}
+              >
+                <SelectTrigger className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg">
+                  <SelectValue placeholder="Select subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjects.map((subject) => (
+                    <SelectItem key={subject} value={subject}>
+                      {subject}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowAddEvent(false)}
+                className="border-border text-foreground hover:bg-primary/10"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddEvent}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Create
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

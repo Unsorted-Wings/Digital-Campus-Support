@@ -7,9 +7,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, X, Trash2, Edit } from "lucide-react";
+import { FileText, Plus, X, Trash2, Edit, File } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 interface Assignment {
   id: number;
@@ -47,15 +48,19 @@ export default function FacultyAssignmentsPage() {
   });
 
   const [selectedAssignment, setSelectedAssignment] = useState<number | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editAssignment, setEditAssignment] = useState<Assignment | null>(null);
   const [newAssignment, setNewAssignment] = useState({ title: "", course: "", dueDate: "", document: null as File | null });
   const courses = ["Mathematics 101", "Physics 201", "CS 301"];
 
+  const filteredAssignments = selectedCourse
+    ? assignments.filter((a) => a.course === selectedCourse)
+    : assignments;
+
   const handleAddOrUpdateAssignment = () => {
     if (newAssignment.title && newAssignment.course && newAssignment.dueDate) {
       if (editAssignment) {
-        // Update existing assignment
         setAssignments((prev) =>
           prev.map((a) =>
             a.id === editAssignment.id
@@ -65,7 +70,6 @@ export default function FacultyAssignmentsPage() {
         );
         console.log("Updated assignment:", newAssignment);
       } else {
-        // Add new assignment
         const newId = assignments.length + 1;
         setAssignments((prev) => [
           ...prev,
@@ -89,6 +93,7 @@ export default function FacultyAssignmentsPage() {
 
   const handleRemoveAssignment = (id: number) => {
     setAssignments((prev) => prev.filter((a) => a.id !== id));
+    if (selectedAssignment === id) setSelectedAssignment(null);
     console.log(`Removed assignment ID: ${id}`);
   };
 
@@ -114,6 +119,16 @@ export default function FacultyAssignmentsPage() {
     setSelectedAssignment(assignmentId);
   };
 
+  const handleViewDocument = (document: File | null) => {
+    if (document) {
+      alert(`Viewing document: ${document.name}`);
+      // Replace with Dialog or new tab
+      // Example: window.open(URL.createObjectURL(document), "_blank");
+    } else {
+      alert("No document attached");
+    }
+  };
+
   const handleSubmitGrade = (assignmentId: number, studentId: number, grade: number) => {
     setSubmissions((prev) => ({
       ...prev,
@@ -126,6 +141,7 @@ export default function FacultyAssignmentsPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
+      {/* Header */}
       <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
         <CardHeader className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
@@ -153,7 +169,7 @@ export default function FacultyAssignmentsPage() {
                       value={newAssignment.title}
                       onChange={(e) => setNewAssignment((prev) => ({ ...prev, title: e.target.value }))}
                       placeholder="Assignment title"
-                      className="bg-muted/50 border-border"
+                      className="bg-muted/50 border-border rounded-md"
                     />
                   </div>
                   <div>
@@ -162,7 +178,7 @@ export default function FacultyAssignmentsPage() {
                       value={newAssignment.course}
                       onValueChange={(value) => setNewAssignment((prev) => ({ ...prev, course: value }))}
                     >
-                      <SelectTrigger className="bg-muted/50 border-border">
+                      <SelectTrigger className="bg-muted/50 border-border rounded-md">
                         <SelectValue placeholder="Select course" />
                       </SelectTrigger>
                       <SelectContent>
@@ -179,7 +195,7 @@ export default function FacultyAssignmentsPage() {
                       type="date"
                       value={newAssignment.dueDate}
                       onChange={(e) => setNewAssignment((prev) => ({ ...prev, dueDate: e.target.value }))}
-                      className="bg-muted/50 border-border"
+                      className="bg-muted/50 border-border rounded-md"
                     />
                   </div>
                   <div>
@@ -189,7 +205,7 @@ export default function FacultyAssignmentsPage() {
                       type="file"
                       accept=".pdf,.doc,.docx"
                       onChange={handleFileChange}
-                      className="bg-muted/50 border-border"
+                      className="bg-muted/50 border-border rounded-md"
                     />
                     {newAssignment.document && (
                       <p className="text-sm text-muted-foreground mt-1">
@@ -199,7 +215,7 @@ export default function FacultyAssignmentsPage() {
                   </div>
                   <Button
                     onClick={handleAddOrUpdateAssignment}
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
                   >
                     {editAssignment ? "Update Assignment" : "Create Assignment"}
                   </Button>
@@ -210,133 +226,174 @@ export default function FacultyAssignmentsPage() {
         </CardHeader>
       </Card>
 
-      <Card className="flex-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-        <CardContent className="p-6 relative z-10">
-          {selectedAssignment === null ? (
-            <ScrollArea className="h-[calc(100vh-12rem)]">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="text-foreground">Title</TableHead>
-                    <TableHead className="text-foreground">Course</TableHead>
-                    <TableHead className="text-foreground">Due Date</TableHead>
-                    <TableHead className="text-foreground">Submissions</TableHead>
-                    <TableHead className="text-foreground">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {assignments.map((assignment) => (
-                    <TableRow
-                      key={assignment.id}
-                      className="hover:bg-primary/5 transition-all duration-300"
-                    >
-                      <TableCell className="font-medium text-foreground">{assignment.title}</TableCell>
-                      <TableCell className="text-muted-foreground">{assignment.course}</TableCell>
-                      <TableCell className="text-muted-foreground">{assignment.dueDate}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {assignment.submissions}/{assignment.totalStudents}
-                      </TableCell>
-                      <TableCell className="flex justify-between gap-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleGrade(assignment.id)}
-                          className="border-border text-foreground hover:bg-primary/10"
-                        >
-                          View Submissions
-                        </Button>
-                        <div className="flex ">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditAssignment(assignment)}
-                            className="text-foreground hover:bg-primary/10"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveAssignment(assignment.id)}
-                            className="text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          ) : (
-            <div className="h-[calc(100vh-12rem)] flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-foreground">
-                  Submissions for {assignments.find((a) => a.id === selectedAssignment)?.title}
-                </h3>
-                <Button
-                  variant="ghost"
-                  onClick={() => setSelectedAssignment(null)}
-                  className="text-foreground hover:bg-primary/10"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
+      {/* Main Content with Sidebar */}
+      <div className="grid grid-cols-[250px_1fr] gap-6 flex-1">
+        {/* Sidebar */}
+        <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl border-r border-border h-full overflow-y-auto">
+          <CardContent className="p-4">
+            <div
+              className={cn(
+                "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300 mb-2",
+                !selectedCourse && "bg-primary/20 border-l-4 border-primary"
+              )}
+              onClick={() => setSelectedCourse(null)}
+            >
+              All Courses
+            </div>
+            {courses.map((course) => (
+              <div
+                key={course}
+                className={cn(
+                  "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
+                  selectedCourse === course && "bg-primary/20 border-l-4 border-primary"
+                )}
+                onClick={() => setSelectedCourse(course)}
+              >
+                {course}
               </div>
-              <ScrollArea className="flex-1">
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Assignments/Submissions */}
+        <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden h-full min-h-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
+          <CardContent className="p-6 relative z-10 flex flex-col h-full min-h-0">
+            {selectedAssignment === null ? (
+              <ScrollArea className="h-full">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="text-foreground">Student</TableHead>
-                      <TableHead className="text-foreground">Submitted At</TableHead>
-                      <TableHead className="text-foreground">File</TableHead>
-                      <TableHead className="text-foreground">Grade</TableHead>
-                      <TableHead className="text-foreground">Action</TableHead>
+                      <TableHead className="text-foreground">Title</TableHead>
+                      <TableHead className="text-foreground">Due Date</TableHead>
+                      <TableHead className="text-foreground">Submissions</TableHead>
+                      <TableHead className="text-foreground">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {submissions[selectedAssignment]?.map((submission) => (
+                    {filteredAssignments.map((assignment) => (
                       <TableRow
-                        key={submission.studentId}
+                        key={assignment.id}
                         className="hover:bg-primary/5 transition-all duration-300"
                       >
-                        <TableCell className="font-medium text-foreground">{submission.studentName}</TableCell>
-                        <TableCell className="text-muted-foreground">{submission.submittedAt}</TableCell>
-                        <TableCell className="text-muted-foreground">{submission.file}</TableCell>
+                        <TableCell className="font-medium text-foreground">{assignment.title}</TableCell>
+                        <TableCell className="text-muted-foreground">{assignment.dueDate}</TableCell>
                         <TableCell className="text-muted-foreground">
-                          {submission.grade !== undefined ? `${submission.grade}/100` : "Not Graded"}
+                          {assignment.submissions}/{assignment.totalStudents}
                         </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            placeholder="Grade"
-                            className="w-20 inline-block mr-2 bg-muted/50 border-border"
-                            onChange={(e) => {
-                              const grade = parseInt(e.target.value);
-                              if (grade >= 0 && grade <= 100) {
-                                handleSubmitGrade(selectedAssignment, submission.studentId, grade);
-                              }
-                            }}
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => console.log(`Download ${submission.file}`)}
-                            className="border-border text-foreground hover:bg-primary/10"
-                          >
-                            Download
-                          </Button>
+                        <TableCell className="flex justify-between gap-4">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGrade(assignment.id)}
+                              className="border-border text-foreground hover:bg-primary/10"
+                            >
+                              View Submissions
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewDocument(assignment.document ?? null)}
+                              className="border-border text-foreground hover:bg-primary/10"
+                              disabled={!assignment.document}
+                            >
+                              <File className="h-4 w-4 mr-2" />
+                              View Assignment
+                            </Button>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditAssignment(assignment)}
+                              className="text-foreground hover:bg-primary/10"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveAssignment(assignment.id)}
+                              className="text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </ScrollArea>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ) : (
+              <div className="h-full flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-foreground">
+                    Submissions for {assignments.find((a) => a.id === selectedAssignment)?.title}
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setSelectedAssignment(null)}
+                    className="text-foreground hover:bg-primary/10"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+                <ScrollArea className="flex-1">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="text-foreground">Student</TableHead>
+                        <TableHead className="text-foreground">Submitted At</TableHead>
+                        <TableHead className="text-foreground">File</TableHead>
+                        <TableHead className="text-foreground">Grade</TableHead>
+                        <TableHead className="text-foreground">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {submissions[selectedAssignment]?.map((submission) => (
+                        <TableRow
+                          key={submission.studentId}
+                          className="hover:bg-primary/5 transition-all duration-300"
+                        >
+                          <TableCell className="font-medium text-foreground">{submission.studentName}</TableCell>
+                          <TableCell className="text-muted-foreground">{submission.submittedAt}</TableCell>
+                          <TableCell className="text-muted-foreground">{submission.file}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {submission.grade !== undefined ? `${submission.grade}/100` : "Not Graded"}
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              placeholder="Grade"
+                              className="w-20 inline-block mr-2 bg-muted/50 border-border rounded-md"
+                              onChange={(e) => {
+                                const grade = parseInt(e.target.value);
+                                if (grade >= 0 && grade <= 100) {
+                                  handleSubmitGrade(selectedAssignment, submission.studentId, grade);
+                                }
+                              }}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => console.log(`Download ${submission.file}`)}
+                              className="border-border text-foreground hover:bg-primary/10"
+                            >
+                              Download
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

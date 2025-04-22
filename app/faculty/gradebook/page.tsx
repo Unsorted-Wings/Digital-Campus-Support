@@ -5,9 +5,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { BarChart, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface Student {
   id: number;
@@ -85,9 +86,9 @@ export default function FacultyGradebookPage() {
     },
   ]);
 
-  const [selectedSubjects, setSelectedSubjects] = useState<{ [courseName: string]: string }>(
-    courses.reduce((acc, course) => ({ ...acc, [course.name]: course.subjects[0].name }), {})
-  );
+  const [selectedCourse, setSelectedCourse] = useState(courses[0].name);
+  const [selectedSubject, setSelectedSubject] = useState(courses[0].subjects[0].name);
+  const [openCourse, setOpenCourse] = useState(courses[0].name);
 
   const calculateFinalMarks = (student: Student): number => {
     const s1 = student.sessional1 ?? 0;
@@ -100,8 +101,8 @@ export default function FacultyGradebookPage() {
   };
 
   const updateMarks = (
-    courseIdx: number,
-    subjectIdx: number,
+    courseName: string,
+    subjectName: string,
     studentId: number,
     field: keyof Student,
     value: string
@@ -116,16 +117,16 @@ export default function FacultyGradebookPage() {
 
     if (numValue > maxValue) return;
 
-    setCourses((prev) =>
-      prev.map((course, cIdx) =>
-        cIdx === courseIdx
+    setCourses((prev: { name: string; subjects: any[]; }[]) =>
+      prev.map((course: { name: string; subjects: any[]; }) =>
+        course.name === courseName
           ? {
               ...course,
-              subjects: course.subjects.map((subject, sIdx) =>
-                sIdx === subjectIdx
+              subjects: course.subjects.map((subject) =>
+                subject.name === subjectName
                   ? {
                       ...subject,
-                      students: subject.students.map((student) =>
+                      students: subject.students.map((student: { id: number; }) =>
                         student.id === studentId
                           ? { ...student, [field]: numValue }
                           : student
@@ -140,11 +141,14 @@ export default function FacultyGradebookPage() {
   };
 
   const handleSubjectChange = (courseName: string, subjectName: string) => {
-    setSelectedSubjects((prev) => ({ ...prev, [courseName]: subjectName }));
+    setSelectedCourse(courseName);
+    setSelectedSubject(subjectName);
+    setOpenCourse(courseName);
   };
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
+      {/* Header */}
       <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
         <CardHeader className="p-4">
           <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
@@ -153,154 +157,164 @@ export default function FacultyGradebookPage() {
           </CardTitle>
         </CardHeader>
       </Card>
-      <Card className="flex-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-        <CardContent className="p-6 relative z-10">
-          <Tabs defaultValue={courses[0].name} className="w-full">
-            <TabsList className="grid grid-cols-3 w-full bg-muted/50 rounded-lg p-1 mb-4">
-              {courses.map((course) => (
-                <TabsTrigger
-                  key={course.name}
-                  value={course.name}
-                  className="rounded-md py-2 text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-300"
-                >
+
+      {/* Main Content with Sidebar */}
+      <div className="grid grid-cols-[250px_1fr] gap-6 flex-1">
+        {/* Sidebar */}
+        <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl border-r border-border h-full overflow-y-auto">
+          <CardContent className="p-4">
+            {courses.map((course) => (
+              <Collapsible
+                key={course.name}
+                open={openCourse === course.name}
+                onOpenChange={() => setOpenCourse(openCourse === course.name ? "" : course.name)}
+                className="mb-2"
+              >
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 text-foreground font-semibold text-lg hover:bg-primary/10 rounded-md transition-all duration-300">
                   {course.name}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {courses.map((course, courseIdx) => (
-              <TabsContent key={course.name} value={course.name}>
-                <div className="mb-4">
-                  <Select
-                    value={selectedSubjects[course.name]}
-                    onValueChange={(value) => handleSubjectChange(course.name, value)}
-                  >
-                    <SelectTrigger className="w-[200px] bg-muted/50 border-border rounded-lg">
-                      <SelectValue placeholder="Select subject" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {course.subjects.map((subject) => (
-                        <SelectItem key={subject.name} value={subject.name}>
-                          {subject.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <ScrollArea className="h-[calc(100vh-16rem)]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="text-foreground">Student</TableHead>
-                        <TableHead className="text-foreground">Sessional 1 (10)</TableHead>
-                        <TableHead className="text-foreground">Sessional 2 (10)</TableHead>
-                        <TableHead className="text-foreground">Attendance (5)</TableHead>
-                        <TableHead className="text-foreground">Assignments (5)</TableHead>
-                        <TableHead className="text-foreground">Final Internal (30)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {course.subjects
-                        .find((subject) => subject.name === selectedSubjects[course.name])
-                        ?.students.map((student) => (
-                          <TableRow
-                            key={student.id}
-                            className="hover:bg-primary/5 transition-all duration-300"
-                          >
-                            <TableCell className="font-medium text-foreground">{student.name}</TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                value={student.sessional1 ?? ""}
-                                onChange={(e) =>
-                                  updateMarks(
-                                    courseIdx,
-                                    course.subjects.findIndex((s) => s.name === selectedSubjects[course.name]),
-                                    student.id,
-                                    "sessional1",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-16 bg-muted/50 border-border"
-                                placeholder="0-10"
-                                min="0"
-                                max="10"
-                                step="0.1"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                value={student.sessional2 ?? ""}
-                                onChange={(e) =>
-                                  updateMarks(
-                                    courseIdx,
-                                    course.subjects.findIndex((s) => s.name === selectedSubjects[course.name]),
-                                    student.id,
-                                    "sessional2",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-16 bg-muted/50 border-border"
-                                placeholder="0-10"
-                                min="0"
-                                max="10"
-                                step="0.1"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                value={student.attendance ?? ""}
-                                onChange={(e) =>
-                                  updateMarks(
-                                    courseIdx,
-                                    course.subjects.findIndex((s) => s.name === selectedSubjects[course.name]),
-                                    student.id,
-                                    "attendance",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-16 bg-muted/50 border-border"
-                                placeholder="0-5"
-                                min="0"
-                                max="5"
-                                step="0.1"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                value={student.assignments ?? ""}
-                                onChange={(e) =>
-                                  updateMarks(
-                                    courseIdx,
-                                    course.subjects.findIndex((s) => s.name === selectedSubjects[course.name]),
-                                    student.id,
-                                    "assignments",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-16 bg-muted/50 border-border"
-                                placeholder="0-5"
-                                min="0"
-                                max="5"
-                                step="0.1"
-                              />
-                            </TableCell>
-                            <TableCell className="text-foreground font-medium">
-                              {calculateFinalMarks(student).toFixed(1)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
-              </TabsContent>
+                  {openCourse === course.name ? (
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                  {course.subjects.map((subject) => (
+                    <div
+                      key={subject.name}
+                      className={cn(
+                        "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
+                        selectedCourse === course.name && selectedSubject === subject.name &&
+                          "bg-primary/20 border-l-4 border-primary"
+                      )}
+                      onClick={() => handleSubjectChange(course.name, subject.name)}
+                    >
+                      {subject.name}
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
             ))}
-          </Tabs>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* Grade Table */}
+        <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden h-full min-h-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
+          <CardContent className="p-6 relative z-10 flex flex-col h-full min-h-0">
+            <ScrollArea className="h-full w-full">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="text-foreground">Student</TableHead>
+                    <TableHead className="text-foreground">Sessional 1 (10)</TableHead>
+                    <TableHead className="text-foreground">Sessional 2 (10)</TableHead>
+                    <TableHead className="text-foreground">Attendance (5)</TableHead>
+                    <TableHead className="text-foreground">Assignments (5)</TableHead>
+                    <TableHead className="text-foreground">Final Internal (30)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {courses
+                    .find((course) => course.name === selectedCourse)
+                    ?.subjects.find((subject) => subject.name === selectedSubject)
+                    ?.students.map((student) => (
+                      <TableRow
+                        key={student.id}
+                        className="hover:bg-primary/5 transition-all duration-300"
+                      >
+                        <TableCell className="font-medium text-foreground">{student.name}</TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={student.sessional1 ?? ""}
+                            onChange={(e) =>
+                              updateMarks(
+                                selectedCourse,
+                                selectedSubject,
+                                student.id,
+                                "sessional1",
+                                e.target.value
+                              )
+                            }
+                            className="w-16 bg-muted/50 border-border rounded-md"
+                            placeholder="0-10"
+                            min="0"
+                            max="10"
+                            step="0.1"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={student.sessional2 ?? ""}
+                            onChange={(e) =>
+                              updateMarks(
+                                selectedCourse,
+                                selectedSubject,
+                                student.id,
+                                "sessional2",
+                                e.target.value
+                              )
+                            }
+                            className="w-16 bg-muted/50 border-border rounded-md"
+                            placeholder="0-10"
+                            min="0"
+                            max="10"
+                            step="0.1"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={student.attendance ?? ""}
+                            onChange={(e) =>
+                              updateMarks(
+                                selectedCourse,
+                                selectedSubject,
+                                student.id,
+                                "attendance",
+                                e.target.value
+                              )
+                            }
+                            className="w-16 bg-muted/50 border-border rounded-md"
+                            placeholder="0-5"
+                            min="0"
+                            max="5"
+                            step="0.1"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={student.assignments ?? ""}
+                            onChange={(e) =>
+                              updateMarks(
+                                selectedCourse,
+                                selectedSubject,
+                                student.id,
+                                "assignments",
+                                e.target.value
+                              )
+                            }
+                            className="w-16 bg-muted/50 border-border rounded-md"
+                            placeholder="0-5"
+                            min="0"
+                            max="5"
+                            step="0.1"
+                          />
+                        </TableCell>
+                        <TableCell className="text-foreground font-medium">
+                          {calculateFinalMarks(student).toFixed(1)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

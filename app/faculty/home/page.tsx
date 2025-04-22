@@ -12,8 +12,8 @@ export default function FacultyHomePage() {
     name: "Dr. Emily Carter",
     role: "Faculty",
     email: "emily.carter@university.edu",
-    department: "Mathematics",
     avatar: "/faculty/emily-carter.jpg",
+    subjects: ["Algebra", "Calculus", "Mechanics"],
   };
 
   const schedule = [
@@ -32,7 +32,7 @@ export default function FacultyHomePage() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-[1fr_2.5fr_1fr] gap-6">
       {/* Column 1: Profile Card */}
-      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl flex flex-col h-[calc(100vh-5rem)]">
+      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl flex flex-col h-[calc(100vh-5rem)] relative overflow-hidden">
         <CardHeader className="text-center border-b border-border">
           <Avatar className="w-20 h-20 mx-auto mb-4">
             <AvatarImage src={profile.avatar} alt={profile.name} />
@@ -51,18 +51,35 @@ export default function FacultyHomePage() {
               <span className="font-medium text-foreground">Email:</span> {profile.email}
             </div>
             <div className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">Department:</span> {profile.department}
+              <span className="font-medium text-foreground">Subjects:</span>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {profile.subjects.map((subject) => (
+                  <Badge key={subject} variant="outline" className="text-primary border-primary">
+                    {subject}
+                  </Badge>
+                ))}
+              </div>
             </div>
           </div>
-          <Button
-            variant="outline"
-            className="w-full mt-4 border-border text-foreground hover:bg-primary/10"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Log Out
-          </Button>
+          <div className="space-y-2 mt-4">
+            <Button
+              variant="outline"
+              className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-full transition-all duration-300"
+              onClick={() => alert("Change Password functionality to be implemented")}
+            >
+              Change Password
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-full transition-all duration-300"
+              onClick={() => alert("Logging out...")}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Log Out
+            </Button>
+          </div>
         </CardContent>
-        <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-20 pointer-events-none" />
       </Card>
 
       {/* Column 2: Schedule */}
@@ -99,7 +116,7 @@ export default function FacultyHomePage() {
             <p className="text-muted-foreground text-center py-8">No events scheduled for today</p>
           )}
         </CardContent>
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
       </Card>
 
       {/* Column 3: Notifications */}
@@ -148,7 +165,7 @@ export default function FacultyHomePage() {
             <p className="text-muted-foreground text-center py-8 text-sm">No new notifications</p>
           )}
         </CardContent>
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-20 pointer-events-none" />
       </Card>
     </div>
   );

@@ -3,10 +3,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Star } from "lucide-react";
 import { useState } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 
 interface Review {
   id: number;
@@ -85,13 +85,20 @@ export default function FacultyReviewsPage() {
     },
   ]);
 
-  const [selectedSubjects, setSelectedSubjects] = useState<{ [courseName: string]: string }>(
-    courses.reduce((acc, course) => ({ ...acc, [course.name]: course.subjects[0].name }), {})
-  );
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [openCourses, setOpenCourses] = useState<{ [courseName: string]: boolean }>({});
 
-  const handleSubjectChange = (courseName: string, subjectName: string) => {
-    setSelectedSubjects((prev) => ({ ...prev, [courseName]: subjectName }));
-  };
+  const filteredReviews = selectedCourse
+    ? selectedSubject
+      ? courses
+          .find((c) => c.name === selectedCourse)!
+          .subjects.find((s) => s.name === selectedSubject)!
+          .reviews
+      : courses
+          .find((c) => c.name === selectedCourse)!
+          .subjects.flatMap((s) => s.reviews)
+    : courses.flatMap((c) => c.subjects).flatMap((s) => s.reviews);
 
   const calculateAggregate = (reviews: Review[]) => {
     if (reviews.length === 0) return { teachingStyle: 0, cooperation: 0, clarity: 0, engagement: 0, supportiveness: 0, overall: 0 };
@@ -147,6 +154,10 @@ export default function FacultyReviewsPage() {
     );
   };
 
+  const handleToggleCourse = (courseName: string, open: boolean) => {
+    setOpenCourses((prev) => ({ ...prev, [courseName]: open }));
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
       {/* Header */}
@@ -163,119 +174,128 @@ export default function FacultyReviewsPage() {
         </CardHeader>
       </Card>
 
-      {/* Main Content with Tabs */}
-      <Card className="flex-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-        <CardContent className="p-6 relative z-10">
-          <Tabs defaultValue={courses[0].name} className="w-full">
-            <TabsList className="grid grid-cols-3 w-full bg-muted/50 rounded-lg p-1 mb-4">
-              {courses.map((course) => (
-                <TabsTrigger
-                  key={course.name}
-                  value={course.name}
-                  className="rounded-md py-2 text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-300"
+      {/* Main Content with Sidebar */}
+      <div className="grid grid-cols-[250px_1fr] gap-6 flex-1">
+        {/* Sidebar */}
+        <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl border-r border-border h-full overflow-y-auto">
+          <CardContent className="p-4">
+            <div
+              className={cn(
+                "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300 mb-2",
+                !selectedCourse && !selectedSubject && "bg-primary/20 border-l-4 border-primary"
+              )}
+              onClick={() => { setSelectedCourse(null); setSelectedSubject(null); }}
+            >
+              All Courses
+            </div>
+            {courses.map((course) => (
+              <Collapsible
+                key={course.name}
+                open={openCourses[course.name]}
+                onOpenChange={(open) => handleToggleCourse(course.name, open)}
+              >
+                <CollapsibleTrigger
+                  className={cn(
+                    "w-full text-left p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
+                    selectedCourse === course.name && !selectedSubject && "bg-primary/20 border-l-4 border-primary"
+                  )}
+                  onClick={() => { setSelectedCourse(course.name); setSelectedSubject(null); }}
                 >
                   {course.name}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {courses.map((course) => (
-              <TabsContent key={course.name} value={course.name}>
-                <div className="mb-4">
-                  <Select
-                    value={selectedSubjects[course.name]}
-                    onValueChange={(value) => handleSubjectChange(course.name, value)}
-                  >
-                    <SelectTrigger className="w-[200px] bg-muted/50 border-border rounded-lg">
-                      <SelectValue placeholder="Select subject" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {course.subjects.map((subject) => (
-                        <SelectItem key={subject.name} value={subject.name}>
-                          {subject.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {/* Aggregate Data */}
-                {(() => {
-                  const reviews = course.subjects.find((subject) => subject.name === selectedSubjects[course.name])?.reviews || [];
-                  const aggregate = calculateAggregate(reviews);
-                  return (
-                    <Card className="bg-muted/50 p-4 mb-6 rounded-lg">
-                      <h3 className="text-lg font-semibold text-foreground mb-4">Aggregate Review Data</h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
-                          <p className="text-sm text-muted-foreground">Teaching Style</p>
-                          {renderStars(aggregate.teachingStyle)}
-                        </div>
-                        <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
-                          <p className="text-sm text-muted-foreground">Cooperation</p>
-                          {renderStars(aggregate.cooperation)}
-                        </div>
-                        <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
-                          <p className="text-sm text-muted-foreground">Clarity</p>
-                          {renderStars(aggregate.clarity)}
-                        </div>
-                        <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
-                          <p className="text-sm text-muted-foreground">Engagement</p>
-                          {renderStars(aggregate.engagement)}
-                        </div>
-                        <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
-                          <p className="text-sm text-muted-foreground">Supportiveness</p>
-                          {renderStars(aggregate.supportiveness)}
-                        </div>
-                        <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
-                          <p className="text-sm text-muted-foreground">Overall Average</p>
-                          {renderStars(aggregate.overall)}
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })()}
-                {/* Reviews Table */}
-                <ScrollArea className="h-[calc(100vh-16rem)]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="text-foreground">Teaching Style</TableHead>
-                        <TableHead className="text-foreground">Cooperation</TableHead>
-                        <TableHead className="text-foreground">Clarity</TableHead>
-                        <TableHead className="text-foreground">Engagement</TableHead>
-                        <TableHead className="text-foreground">Supportiveness</TableHead>
-                        <TableHead className="text-foreground">Average</TableHead>
-                        <TableHead className="text-foreground">Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {course.subjects
-                        .find((subject) => subject.name === selectedSubjects[course.name])
-                        ?.reviews.map((review) => (
-                          <TableRow key={review.id} className="hover:bg-primary/5 transition-all duration-300">
-                            <TableCell className="text-foreground">{review.teachingStyle} / 5</TableCell>
-                            <TableCell className="text-foreground">{review.cooperation} / 5</TableCell>
-                            <TableCell className="text-foreground">{review.clarity} / 5</TableCell>
-                            <TableCell className="text-foreground">{review.engagement} / 5</TableCell>
-                            <TableCell className="text-foreground">{review.supportiveness} / 5</TableCell>
-                            <TableCell className="text-foreground font-medium">{calculateReviewAverage(review)} / 5</TableCell>
-                            <TableCell className="text-muted-foreground">{review.date}</TableCell>
-                          </TableRow>
-                        )) || (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground">
-                            No reviews available for this subject.
-                          </TableCell>
-                        </TableRow>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  {course.subjects.map((subject) => (
+                    <div
+                      key={subject.name}
+                      className={cn(
+                        "p-2 pl-6 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
+                        selectedCourse === course.name && selectedSubject === subject.name && "bg-primary/20 border-l-4 border-primary"
                       )}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
-              </TabsContent>
+                      onClick={() => { setSelectedCourse(course.name); setSelectedSubject(subject.name); }}
+                    >
+                      {subject.name}
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
             ))}
-          </Tabs>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* Reviews Content */}
+        <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden h-full min-h-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
+          <CardContent className="p-6 relative z-10 flex flex-col h-full min-h-0">
+            {/* Aggregate Data */}
+            <Card className="bg-muted/50 p-4 mb-6 rounded-lg">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Aggregate Review Data</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
+                  <p className="text-sm text-muted-foreground">Teaching Style</p>
+                  {renderStars(calculateAggregate(filteredReviews).teachingStyle)}
+                </div>
+                <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
+                  <p className="text-sm text-muted-foreground">Cooperation</p>
+                  {renderStars(calculateAggregate(filteredReviews).cooperation)}
+                </div>
+                <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
+                  <p className="text-sm text-muted-foreground">Clarity</p>
+                  {renderStars(calculateAggregate(filteredReviews).clarity)}
+                </div>
+                <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
+                  <p className="text-sm text-muted-foreground">Engagement</p>
+                  {renderStars(calculateAggregate(filteredReviews).engagement)}
+                </div>
+                <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
+                  <p className="text-sm text-muted-foreground">Supportiveness</p>
+                  {renderStars(calculateAggregate(filteredReviews).supportiveness)}
+                </div>
+                <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
+                  <p className="text-sm text-muted-foreground">Overall Average</p>
+                  {renderStars(calculateAggregate(filteredReviews).overall)}
+                </div>
+              </div>
+            </Card>
+            {/* Reviews Table */}
+            <ScrollArea className="h-full">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="text-foreground">Teaching Style</TableHead>
+                    <TableHead className="text-foreground">Cooperation</TableHead>
+                    <TableHead className="text-foreground">Clarity</TableHead>
+                    <TableHead className="text-foreground">Engagement</TableHead>
+                    <TableHead className="text-foreground">Supportiveness</TableHead>
+                    <TableHead className="text-foreground">Average</TableHead>
+                    <TableHead className="text-foreground">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredReviews.length > 0 ? (
+                    filteredReviews.map((review) => (
+                      <TableRow key={review.id} className="hover:bg-primary/5 transition-all duration-300">
+                        <TableCell className="text-foreground">{review.teachingStyle} / 5</TableCell>
+                        <TableCell className="text-foreground">{review.cooperation} / 5</TableCell>
+                        <TableCell className="text-foreground">{review.clarity} / 5</TableCell>
+                        <TableCell className="text-foreground">{review.engagement} / 5</TableCell>
+                        <TableCell className="text-foreground">{review.supportiveness} / 5</TableCell>
+                        <TableCell className="text-foreground font-medium">{calculateReviewAverage(review)} / 5</TableCell>
+                        <TableCell className="text-muted-foreground">{review.date}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        No reviews available.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
