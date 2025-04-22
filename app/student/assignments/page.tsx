@@ -25,6 +25,10 @@ import { useState } from "react";
 export default function AssignmentSubmissionPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(false); // State to track upload status
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
   const [filterSubject, setFilterSubject] = useState<string>("All");
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [sortField, setSortField] = useState<string>("dueDate");
@@ -88,12 +92,44 @@ export default function AssignmentSubmissionPage() {
     }
   };
 
-  const handleSubmit = (assignmentId: number) => {
-    if (selectedFile) {
-      console.log(`Submitting ${selectedFile.name} for assignment ID ${assignmentId}`);
-      setSelectedFile(null);
-      setSelectedAssignment(null);
-      // Update status in real implementation
+  const handleSubmit = async (assignmentId: number) => {
+    if (!selectedFile) {
+      setUploadError("Please select a file to upload.");
+      return;
+    }
+    console.log('uploading...')
+    setUploading(true);
+    setUploadError(null);
+    setUploadSuccess(false);
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("assignmentId", assignmentId.toString()); // You might want to send the assignment ID
+
+    try {
+      const response = await fetch("/api/DocRepo/uploadAssignment", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Upload successful:", data);
+        setUploading(false);
+        setSelectedFile(null);
+        setSelectedAssignment(null);
+        setUploadSuccess(true);
+        // Optionally, update the assignment status in the UI
+      } else {
+        const errorData = await response.json();
+        console.error("Upload failed:", errorData);
+        setUploadError(errorData?.error || "Failed to upload file.");
+        setUploading(false);
+      }
+    } catch (error: any) {
+      console.error("Error during upload:", error);
+      setUploadError(error.message || "An unexpected error occurred.");
+      setUploading(false);
     }
   };
 
