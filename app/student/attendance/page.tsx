@@ -44,7 +44,7 @@ export default function AttendancePage() {
       {/* Header */}
       <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-        <CardHeader className="p-4 flex items-center justify-between relative z-10">
+        <CardHeader className="p-4 flex justify-between relative z-10">
           <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
             <UserCheck className="h-6 w-6 text-primary" />
             Attendance

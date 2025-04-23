@@ -64,17 +64,16 @@ export default function FacultyHomePage() {
           <div className="space-y-2 mt-4">
             <Button
               variant="outline"
-              className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-full transition-all duration-300"
+              className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-lg transition-all duration-300"
               onClick={() => alert("Change Password functionality to be implemented")}
             >
               Change Password
             </Button>
             <Button
               variant="outline"
-              className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-full transition-all duration-300"
+              className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-lg transition-all duration-300"
               onClick={() => alert("Logging out...")}
             >
-              <LogOut className="mr-2 h-4 w-4" />
               Log Out
             </Button>
           </div>

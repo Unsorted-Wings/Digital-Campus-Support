@@ -179,21 +179,13 @@ export default function StudentFacultyReviewPage() {
       {/* Header */}
       <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-        <CardHeader className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
-          <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-primary" />
+        <CardHeader className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
+          <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
+            <MessageSquare className="h-6 w-6 text-primary" />
             {selectedFaculty && selectedCourse
               ? `Rate ${facultyList.find((f) => f.id === parseInt(selectedFaculty))?.name} for ${selectedCourse}`
               : "Rate Faculty"}
           </CardTitle>
-          <Button
-            variant="outline"
-            className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-full p-2"
-            aria-label="Help"
-            onClick={() => alert("Submit a review to rate faculty on teaching style, cooperation, clarity, engagement, and supportiveness.")}
-          >
-            <HelpCircle className="h-5 w-5" />
-          </Button>
         </CardHeader>
       </Card>
       

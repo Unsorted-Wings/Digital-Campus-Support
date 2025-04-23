@@ -107,11 +107,13 @@ export default function AssignmentSubmissionPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6">
       {/* Header with Filters */}
       <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl">
         <CardHeader className="p-4 gap-4">
-          <CardTitle className="text-3xl font-bold text-foreground">
+          <CardTitle className="text-3xl font-bold flex items-center gap-2 text-foreground">
+            
+          <FileText className="h-6 w-6 text-primary" />
             Assignment Submission
           </CardTitle>
         </CardHeader>
@@ -123,8 +125,7 @@ export default function AssignmentSubmissionPage() {
         <Card className="lg:col-span-3 bg-card/95 backdrop-blur-md shadow-lg rounded-xl flex flex-col relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
           <CardHeader className="p-4 border-b border-border relative z-10">
-            <CardTitle className="text-xl font-semibold text-foreground flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
+            <CardTitle className="text-xl font-semibold text-foreground gap-2">
               Assignments
             </CardTitle>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">

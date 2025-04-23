@@ -1,577 +1,606 @@
 "use client";
 
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Users, Settings, Trash2, Send } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { Send, Search, MoreVertical, BarChart2, CheckCheck, X, Smile, Check } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { format } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
+import Link from "next/link";
 
-interface Faculty {
-    id: number;
-    name: string;
+interface Chat {
+  id: number;
+  name: string;
+  lastMessage: string;
+  time: string;
+}
+
+interface Poll {
+  id: number;
+  question: string;
+  options: { text: string; votes: number }[];
+  allowMultiple: boolean;
+  votes: { userId: number; optionIdx: number }[];
 }
 
 interface Message {
-    id: number;
-    senderId: number;
-    content: string;
-    timestamp: string;
+  id: number;
+  chatId: number;
+  type: "message" | "poll";
+  sender: string;
+  senderId: number;
+  text?: string;
+  time: string;
+  isSent: boolean;
+  readBy?: number[];
+  reactions: { [userId: number]: string };
+  poll?: Poll;
 }
 
-interface Group {
-    id: number;
-    name: string;
-    members: number[];
-    admins: number[];
-    ownerId: number;
-    permissions: "admin-only" | "everyone";
-    messages: Message[];
-}
+export default function ChatPage() {
+  const [selectedChat, setSelectedChat] = useState<number | null>(0);
+  const [message, setMessage] = useState("");
+  const [showPollDialog, setShowPollDialog] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
+  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [pollError, setPollError] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-export default function AdminChatPage() {
-    const [facultyList] = useState<Faculty[]>([
-        { id: 1, name: "Dr. John Smith" },
-        { id: 2, name: "Prof. Jane Doe" },
-        { id: 3, name: "Dr. Alan Brown" },
-    ]);
+  const chats: Chat[] = [
+    { id: 0, name: "Study Group", lastMessage: "Hey, let’s meet at 2 PM!", time: "12:30 PM" },
+    { id: 1, name: "Prof. Smith", lastMessage: "Check the Calculus notes here: /docs/math-lecture.pdf", time: "10:15 AM" },
+    { id: 2, name: "Jane Doe", lastMessage: "Can you send the notes?", time: "Yesterday" },
+    { id: 3, name: "CS Club", lastMessage: "Event this Friday!", time: "Monday" },
+  ];
 
-    const [groups, setGroups] = useState<Group[]>([
-        {
-            id: 1,
-            name: "Math Faculty Chat",
-            members: [1, 2],
-            admins: [1],
-            ownerId: 1,
-            permissions: "admin-only",
-            messages: [
-                { id: 1, senderId: 1, content: "Welcome to the group!", timestamp: "2025-04-19T10:00:00Z" },
-                { id: 2, senderId: 2, content: "Thanks for setting this up!", timestamp: "2025-04-19T10:05:00Z" },
-            ],
-        },
-        {
-            id: 2,
-            name: "Physics Discussion",
-            members: [2, 3],
-            admins: [2],
-            ownerId: 2,
-            permissions: "everyone",
-            messages: [
-                { id: 1, senderId: 2, content: "Any updates on the lab schedule?", timestamp: "2025-04-19T11:00:00Z" },
-            ],
-        },
-    ]);
+  const currentUserId = 1;
 
-    const [selectedGroup, setSelectedGroup] = useState<Group | null>(groups[0] || null);
-    const [openDialog, setOpenDialog] = useState<"create" | "info" | null>(null);
-    const [newGroup, setNewGroup] = useState<{ name: string; members: number[]; permissions: "admin-only" | "everyone" }>({
-        name: "",
-        members: [],
-        permissions: "admin-only",
-    });
-    const [messageInput, setMessageInput] = useState("");
-    const [error, setError] = useState<string>("");
-    const scrollRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 1,
+      chatId: 0,
+      type: "message",
+      sender: "You",
+      senderId: 1,
+      text: "Hey everyone, ready for the quiz?",
+      time: "2025-04-22T12:25:00Z",
+      isSent: true,
+      readBy: [1],
+      reactions: {},
+    },
+    {
+      id: 2,
+      chatId: 0,
+      type: "message",
+      sender: "Mike",
+      senderId: 2,
+      text: "Yeah, just reviewing now!",
+      time: "2025-04-22T12:26:00Z",
+      isSent: false,
+      readBy: [2],
+      reactions: { 1: "👍" },
+    },
+    {
+      id: 3,
+      chatId: 0,
+      type: "message",
+      sender: "You",
+      senderId: 1,
+      text: "Cool, see you at 2!",
+      time: "2025-04-22T12:30:00Z",
+      isSent: true,
+      readBy: [1],
+      reactions: {},
+    },
+    {
+      id: 4,
+      chatId: 0,
+      type: "poll",
+      sender: "You",
+      senderId: 1,
+      time: "2025-04-22T12:35:00Z",
+      isSent: true,
+      readBy: [1],
+      reactions: {},
+      poll: {
+        id: 1,
+        question: "What time for the study session?",
+        options: [
+          { text: "2 PM", votes: 2 },
+          { text: "4 PM", votes: 1 },
+        ],
+        allowMultiple: false,
+        votes: [
+          { userId: 1, optionIdx: 0 },
+          { userId: 2, optionIdx: 0 },
+          { userId: 3, optionIdx: 1 },
+        ],
+      },
+    },
+    {
+      id: 5,
+      chatId: 1,
+      type: "message",
+      sender: "Prof. Smith",
+      senderId: 4,
+      text: "Check the Calculus notes here: /docs/math-lecture.pdf",
+      time: "2025-04-22T10:15:00Z",
+      isSent: false,
+      readBy: [4],
+      reactions: {},
+    },
+  ]);
 
-    // Hardcode current user as Dr. John Smith (ID 1) for testing
-    const currentUserId = 1;
+  // Simulate read receipts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMessages((prev) =>
+        prev.map((m) => ({
+          ...m,
+          readBy: m.readBy?.includes(currentUserId) ? m.readBy : [...(m.readBy || []), 2, 3, 4],
+        }))
+      );
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [messages, currentUserId]);
 
-    // Scroll to bottom of messages on update
-    useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  // Scroll to bottom
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isTyping]);
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    if (isToday(date)) return format(date, "HH:mm");
+    if (isYesterday(date)) return `Yesterday ${format(date, "HH:mm")}`;
+    return format(date, "MMM d, yyyy HH:mm");
+  };
+
+  const handleSend = () => {
+    if (message.trim()) {
+      const newMessage: Message = {
+        id: messages.length + 1,
+        chatId: selectedChat!,
+        type: "message",
+        sender: "You",
+        senderId: currentUserId,
+        text: message,
+        time: new Date().toISOString(),
+        isSent: true,
+        readBy: [currentUserId],
+        reactions: {},
+      };
+      setMessages([...messages, newMessage]);
+      setMessage("");
+    }
+  };
+
+  const handleCreatePoll = () => {
+    if (!pollQuestion.trim()) {
+      setPollError("Poll question is required.");
+      return;
+    }
+    if (pollOptions.length < 2 || pollOptions.some((opt) => !opt.trim())) {
+      setPollError("At least two non-empty options are required.");
+      return;
+    }
+    const newPoll: Message = {
+      id: messages.length + 1,
+      chatId: selectedChat!,
+      type: "poll",
+      sender: "You",
+      senderId: currentUserId,
+      time: new Date().toISOString(),
+      isSent: true,
+      readBy: [currentUserId],
+      reactions: {},
+      poll: {
+        id: messages.filter((m) => m.type === "poll").length + 1,
+        question: pollQuestion,
+        options: pollOptions.map((opt) => ({ text: opt, votes: 0 })),
+        allowMultiple,
+        votes: [],
+      },
+    };
+    setMessages([...messages, newPoll]);
+    setPollQuestion("");
+    setPollOptions(["", ""]);
+    setAllowMultiple(false);
+    setShowPollDialog(false);
+    setPollError("");
+  };
+
+  const handleVote = (pollId: number, optionIdx: number) => {
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.type !== "poll" || msg.poll?.id !== pollId) return msg;
+        const poll = { ...msg.poll! };
+        const existingVote = poll.votes.find((v) => v.userId === currentUserId);
+        if (!poll.allowMultiple && existingVote) {
+          poll.votes = poll.votes.filter((v) => v.userId !== currentUserId);
+          poll.options[existingVote.optionIdx].votes -= 1;
         }
-    }, [selectedGroup?.messages]);
-
-    const handleCreateGroup = () => {
-        if (!newGroup.name.trim()) {
-            setError("Group name is required.");
-            return;
-        }
-        if (!newGroup.members.length) {
-            setError("At least one member is required.");
-            return;
-        }
-        const newId = groups.length + 1;
-        const newGroupData = {
-            id: newId,
-            name: newGroup.name,
-            members: [...newGroup.members, currentUserId],
-            admins: [currentUserId],
-            ownerId: currentUserId,
-            permissions: newGroup.permissions,
-            messages: [],
-        };
-        setGroups([...groups, newGroupData]);
-        setSelectedGroup(newGroupData);
-        console.log("Created group:", newGroup);
-        setNewGroup({ name: "", members: [], permissions: "admin-only" });
-        setOpenDialog(null);
-        setError("");
-    };
-
-    const handleManageMembers = (group: Group, updates: { members?: number[]; admins?: number[] }) => {
-        setGroups(
-            groups.map((g) =>
-                g.id === group.id
-                    ? {
-                        ...g,
-                        members: updates.members || g.members,
-                        admins: updates.admins || g.admins,
-                    }
-                    : g
-            )
-        );
-        setSelectedGroup((prev) =>
-            prev && prev.id === group.id
-                ? { ...prev, members: updates.members || prev.members, admins: updates.admins || prev.admins }
-                : prev
-        );
-        console.log("Updated group:", group.id, updates);
-    };
-
-    const handleUpdateSettings = (group: Group, updates: { name?: string; permissions?: "admin-only" | "everyone" }) => {
-        setGroups(
-            groups.map((g) =>
-                g.id === group.id
-                    ? {
-                        ...g,
-                        name: updates.name || g.name,
-                        permissions: updates.permissions || g.permissions,
-                    }
-                    : g
-            )
-        );
-        setSelectedGroup((prev) =>
-            prev && prev.id === group.id
-                ? { ...prev, name: updates.name || prev.name, permissions: updates.permissions || prev.permissions }
-                : prev
-        );
-        console.log("Updated settings:", group.id, updates);
-        setOpenDialog(null);
-    };
-
-    const handleDeleteGroup = (groupId: number) => {
-        setGroups(groups.filter((g) => g.id !== groupId));
-        setSelectedGroup(groups[0] || null);
-        console.log("Deleted group:", groupId);
-        setOpenDialog(null);
-    };
-
-    const handleSendMessage = () => {
-        if (!messageInput.trim() || !selectedGroup) return;
-        const newMessage = {
-            id: (selectedGroup.messages.length + 1),
-            senderId: currentUserId,
-            content: messageInput,
-            timestamp: new Date().toISOString(),
-        };
-        setGroups(
-            groups.map((g) =>
-                g.id === selectedGroup.id
-                    ? { ...g, messages: [...g.messages, newMessage] }
-                    : g
-            )
-        );
-        setSelectedGroup((prev) =>
-            prev ? { ...prev, messages: [...prev.messages, newMessage] } : prev
-        );
-        setMessageInput("");
-        console.log("Sent message:", newMessage);
-    };
-
-    const isAdminOrOwner = (group: Group) => group.admins.includes(currentUserId) || group.ownerId === currentUserId;
-    const isOwner = (group: Group) => group.ownerId === currentUserId;
-
-    return (
-        <div className="flex min-h-[calc(100vh-5rem)] bg-background">
-            {/* Sidebar */}
-            <div className="w-[30%] border-r bg-muted/50 flex flex-col">
-                <div className="p-4 border-b">
-                    <Button
-                        onClick={() => setOpenDialog("create")}
-                        className="w-full bg-primary/10 text-foreground hover:bg-primary/20 rounded-full"
-                    >
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Create Group
-                    </Button>
-                </div>
-                <ScrollArea className="flex-1">
-                    {groups.map((group) => (
-                        <div
-                            key={group.id}
-                            className={`p-4 border-b cursor-pointer hover:bg-primary/5 transition-all duration-300 ${selectedGroup?.id === group.id ? "bg-primary/10" : ""
-                                }`}
-                            onClick={() => setSelectedGroup(group)}
-                        >
-                            <div className="flex items-center gap-3">
-                                <MessageSquare className="h-8 w-8 text-primary" />
-                                <div className="flex-1">
-                                    <p className="text-foreground font-semibold">{group.name}</p>
-                                    <p className="text-sm text-muted-foreground truncate">
-                                        {group.messages.length > 0
-                                            ? `${facultyList.find((f) => f.id === group.messages[group.messages.length - 1].senderId)?.name || "Unknown"}: ${group.messages[group.messages.length - 1].content
-                                            }`
-                                            : "No messages yet"}
-                                    </p>
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                    {group.messages.length > 0
-                                        ? format(new Date(group.messages[group.messages.length - 1].timestamp), "HH:mm")
-                                        : ""}
-                                </p>
-                            </div>
-                        </div>
-                    ))}
-                </ScrollArea>
-            </div>
-
-            {/* Chat Area */}
-            <div className="w-[70%] flex flex-col">
-                {selectedGroup ? (
-                    <>
-                        {/* Chat Header */}
-                        <CardHeader className="bg-card/95 backdrop-blur-md shadow-sm flex flex-row items-center justify-between p-4">
-                            <div className="flex items-center gap-3">
-                                <MessageSquare className="h-5 w-5 text-primary" />
-                                <div>
-                                    <p className="text-foreground font-bold text-lg">{selectedGroup.name}</p>
-                                    <p className="text-sm text-muted-foreground">{selectedGroup.members.length} members</p>
-                                </div>
-                            </div>
-                            <Button
-                                variant="ghost"
-                                onClick={() => setOpenDialog("info")}
-                                className="text-foreground hover:bg-primary/10"
-                            >
-                                <Settings className="h-5 w-5" />
-                            </Button>
-                        </CardHeader>
-
-                        {/* Messages */}
-                        <ScrollArea className="flex-1 p-4 bg-card/95 backdrop-blur-md" ref={scrollRef}>
-                            <div className="space-y-4">
-                                {selectedGroup.messages.map((message) => (
-                                    <div
-                                        key={message.id}
-                                        className={`flex ${message.senderId === currentUserId ? "justify-end" : "justify-start"}`}
-                                    >
-                                        <div
-                                            className={`max-w-[70%] p-3 rounded-lg relative ${message.senderId === currentUserId ? "bg-primary/10 text-foreground" : "bg-muted/50 text-foreground"
-                                                }`}
-                                            style={{
-                                                borderRadius:
-                                                    message.senderId === currentUserId
-                                                        ? "12px 12px 0 12px"
-                                                        : "12px 12px 12px 0",
-                                            }}
-                                        >
-                                            <p className="text-sm font-semibold">
-                                                {facultyList.find((f) => f.id === message.senderId)?.name || "Unknown"}
-                                            </p>
-                                            <p className="text-sm">{message.content}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {format(new Date(message.timestamp), "HH:mm")}
-                                            </p>
-                                            <div
-                                                className={`absolute bottom-0 ${message.senderId === currentUserId ? "right-[-6px]" : "left-[-6px]"
-                                                    }`}
-                                                style={{
-                                                    width: 0,
-                                                    height: 0,
-                                                    border: `6px solid transparent`,
-                                                    borderTopColor:
-                                                        message.senderId === currentUserId ? "rgba(var(--primary), 0.1)" : "rgba(var(--muted), 0.5)",
-                                                    borderBottom: 0,
-                                                    borderRight: message.senderId === currentUserId ? 0 : "6px solid transparent",
-                                                    borderLeft: message.senderId === currentUserId ? "6px solid transparent" : 0,
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </ScrollArea>
-
-                        {/* Message Input */}
-                        <div className="p-4 bg-card/95 backdrop-blur-md border-t">
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    value={messageInput}
-                                    onChange={(e) => setMessageInput(e.target.value)}
-                                    placeholder="Type a message..."
-                                    className="flex-1 bg-muted/50 border-border rounded-full"
-                                    onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                                />
-                                <Button
-                                    onClick={handleSendMessage}
-                                    className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-full"
-                                >
-                                    <Send className="h-5 w-5" />
-                                </Button>
-                            </div>
-                        </div>
-                    </>
-                ) : (
-                    <div className="flex-1 flex items-center justify-center bg-card/95 backdrop-blur-md">
-                        <p className="text-muted-foreground">Select a group to start chatting</p>
-                    </div>
-                )}
-            </div>
-
-            {/* Create Group Dialog */}
-            <Dialog open={openDialog === "create"} onOpenChange={(open) => !open && setOpenDialog(null)}>
-                <DialogContent className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
-                    <DialogHeader>
-                        <DialogTitle className="text-foreground">Create New Group</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 p-4">
-                        {error && <p className="text-destructive text-sm">{error}</p>}
-                        <div>
-                            <Label htmlFor="groupName" className="text-foreground">Group Name</Label>
-                            <Input
-                                id="groupName"
-                                value={newGroup.name}
-                                onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })}
-                                className="bg-muted/50 border-border"
-                                placeholder="Enter group name"
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="members" className="text-foreground">Add Members</Label>
-                            <Select
-                                onValueChange={(value) => {
-                                    if (!newGroup.members.includes(Number(value))) {
-                                        setNewGroup({ ...newGroup, members: [...newGroup.members, Number(value)] });
-                                    }
-                                }}
-                            >
-                                <SelectTrigger className="bg-muted/50 border-border">
-                                    <SelectValue placeholder="Select members" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {facultyList.map((faculty) => (
-                                        <SelectItem key={faculty.id} value={faculty.id.toString()}>
-                                            {faculty.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {newGroup.members.map((id) => (
-                                    <div
-                                        key={id}
-                                        className="flex items-center gap-1 bg-primary/10 text-foreground px-2 py-1 rounded-full text-sm"
-                                    >
-                                        {facultyList.find((f) => f.id === id)?.name}
-                                        <button
-                                            onClick={() => setNewGroup({ ...newGroup, members: newGroup.members.filter((m) => m !== id) })}
-                                            className="text-destructive"
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div>
-                            <Label htmlFor="permissions" className="text-foreground">Permissions</Label>
-                            <Select
-                                value={newGroup.permissions}
-                                onValueChange={(value) =>
-                                    setNewGroup({ ...newGroup, permissions: value as "admin-only" | "everyone" })
-                                }
-                            >
-                                <SelectTrigger className="bg-muted/50 border-border">
-                                    <SelectValue placeholder="Select permissions" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="admin-only">Admin Only</SelectItem>
-                                    <SelectItem value="everyone">Everyone Can Edit</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <Button
-                            onClick={handleCreateGroup}
-                            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                        >
-                            Create Group
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            {/* Group Info Dialog */}
-            <Dialog open={openDialog === "info"} onOpenChange={(open) => !open && setOpenDialog(null)}>
-                <DialogContent className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
-                    <DialogHeader>
-                        <DialogTitle className="text-foreground">Group Info: {selectedGroup?.name}</DialogTitle>
-                    </DialogHeader>
-                    {selectedGroup ? (
-                        <div className="space-y-4 p-4">
-                            {isAdminOrOwner(selectedGroup) ? (
-                                <>
-                                    {/* Manage Members */}
-                                    <div>
-                                        <Label htmlFor="addMembers" className="text-foreground">Add Members</Label>
-                                        <Select
-                                            onValueChange={(value) => {
-                                                const id = Number(value);
-                                                if (!selectedGroup.members.includes(id)) {
-                                                    handleManageMembers(selectedGroup, {
-                                                        members: [...selectedGroup.members, id],
-                                                    });
-                                                }
-                                            }}
-                                        >
-                                            <SelectTrigger className="bg-muted/50 border-border">
-                                                <SelectValue placeholder="Select members" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {facultyList
-                                                    .filter((f) => !selectedGroup.members.includes(f.id))
-                                                    .map((faculty) => (
-                                                        <SelectItem key={faculty.id} value={faculty.id.toString()}>
-                                                            {faculty.name}
-                                                        </SelectItem>
-                                                    ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <Label className="text-foreground">Members</Label>
-                                        <ScrollArea className="h-[200px]">
-                                            {selectedGroup.members.map((memberId) => {
-                                                const isAdmin = selectedGroup.admins.includes(memberId);
-                                                const isMemberOwner = selectedGroup.ownerId === memberId;
-                                                return (
-                                                    <div
-                                                        key={memberId}
-                                                        className="flex items-center justify-between bg-muted/50 p-2 rounded-lg mb-2"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <Users className="h-5 w-5 text-primary" />
-                                                            <span className="text-foreground">
-                                                                {facultyList.find((f) => f.id === memberId)?.name || "Unknown"}
-                                                                {isMemberOwner && " (Owner)"}
-                                                                {isAdmin && !isMemberOwner && " (Admin)"}
-                                                            </span>
-                                                        </div>
-                                                        {!isMemberOwner && (
-                                                            <div className="flex gap-2">
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => {
-                                                                        const newAdmins = isAdmin
-                                                                            ? selectedGroup.admins.filter((id) => id !== memberId)
-                                                                            : [...selectedGroup.admins, memberId];
-                                                                        handleManageMembers(selectedGroup, { admins: newAdmins });
-                                                                    }}
-                                                                    className="border-border text-foreground hover:bg-primary/10"
-                                                                >
-                                                                    {isAdmin ? "Demote" : "Promote to Admin"}
-                                                                </Button>
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => {
-                                                                        handleManageMembers(selectedGroup, {
-                                                                            members: selectedGroup.members.filter((id) => id !== memberId),
-                                                                            admins: selectedGroup.admins.filter((id) => id !== memberId),
-                                                                        });
-                                                                    }}
-                                                                    className="border-destructive text-destructive hover:bg-destructive/10"
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </ScrollArea>
-                                    </div>
-
-                                    {/* Group Settings */}
-                                    <div>
-                                        <Label htmlFor="groupName" className="text-foreground">Group Name</Label>
-                                        <Input
-                                            id="groupName"
-                                            value={selectedGroup.name}
-                                            onChange={(e) => setSelectedGroup({ ...selectedGroup, name: e.target.value })}
-                                            className="bg-muted/50 border-border"
-                                            placeholder="Enter group name"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="permissions" className="text-foreground">Permissions</Label>
-                                        <Select
-                                            value={selectedGroup.permissions}
-                                            onValueChange={(value) =>
-                                                setSelectedGroup({ ...selectedGroup, permissions: value as "admin-only" | "everyone" })
-                                            }
-                                        >
-                                            <SelectTrigger className="bg-muted/50 border-border">
-                                                <SelectValue placeholder="Select permissions" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="admin-only">Admin Only</SelectItem>
-                                                <SelectItem value="everyone">Everyone Can Edit</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <Button
-                                        onClick={() =>
-                                            handleUpdateSettings(selectedGroup, {
-                                                name: selectedGroup.name,
-                                                permissions: selectedGroup.permissions,
-                                            })
-                                        }
-                                        className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                                    >
-                                        Save Settings
-                                    </Button>
-                                    {isOwner(selectedGroup) && (
-                                        <Button
-                                            variant="destructive"
-                                            onClick={() => handleDeleteGroup(selectedGroup.id)}
-                                            className="w-full"
-                                        >
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Delete Group
-                                        </Button>
-                                    )}
-                                </>
-                            ) : (
-                                <div className="p-4">
-                                    <p className="text-foreground">Members: {selectedGroup.members.length}</p>
-                                    <ScrollArea className="h-[200px] mt-2">
-                                        {selectedGroup.members.map((memberId) => (
-                                            <div key={memberId} className="flex items-center gap-2 p-2">
-                                                <Users className="h-5 w-5 text-primary" />
-                                                <span className="text-foreground">
-                                                    {facultyList.find((f) => f.id === memberId)?.name || "Unknown"}
-                                                    {selectedGroup.ownerId === memberId && " (Owner)"}
-                                                    {selectedGroup.admins.includes(memberId) && selectedGroup.ownerId !== memberId && " (Admin)"}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </ScrollArea>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="p-4">
-                            <p className="text-foreground">No group selected.</p>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
-        </div>
+        poll.votes.push({ userId: currentUserId, optionIdx });
+        poll.options[optionIdx].votes += 1;
+        return { ...msg, poll };
+      })
     );
+  };
+
+  const handleReactMessage = (messageId: number, emoji: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, reactions: { ...m.reactions, [currentUserId]: emoji } }
+          : m
+      )
+    );
+  };
+
+  const renderMessageContent = (text: string) => {
+    const docLinkRegex = /\/docs\/[a-zA-Z0-9-]+\.pdf/;
+    const match = text.match(docLinkRegex);
+    if (match) {
+      const link = match[0];
+      return (
+        <span>
+          {text.replace(link, "")}{" "}
+          <Link href="/student/docs" className="text-primary underline hover:text-primary/80">
+            {link}
+          </Link>
+        </span>
+      );
+    }
+    return text;
+  };
+
+  return (
+    <div className="flex h-[calc(100vh-5rem)] gap-6 p-6 bg-background">
+      {/* Sidebar */}
+      <Card className="w-[250px] bg-card/95 backdrop-blur-md shadow-xl rounded-xl border-r border-border/50 flex flex-col">
+        <CardHeader className="p-4 border-b border-border/30">
+          <CardTitle className="text-xl font-semibold text-foreground">Chats</CardTitle>
+          <div className="relative mt-2">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search chats..."
+              className="pl-9 bg-muted/50 border-border rounded-full shadow-sm focus:ring-2 focus:ring-primary transition-all duration-300"
+            />
+          </div>
+        </CardHeader>
+        <ScrollArea className="flex-1">
+          {chats.map((chat) => (
+            <div
+              key={chat.id}
+              role="button"
+              aria-label={`Select ${chat.name}`}
+              onClick={() => setSelectedChat(chat.id)}
+              className={cn(
+                "flex items-center gap-3 p-4 border-b border-border/50 cursor-pointer transition-all duration-300",
+                selectedChat === chat.id
+                  ? "bg-primary/20 border-l-4 border-primary"
+                  : "hover:bg-primary/10"
+              )}
+            >
+              <Avatar className="w-10 h-10">
+                <AvatarImage src={`/chat-${chat.id}.jpg`} alt={chat.name} />
+                <AvatarFallback className="bg-primary/20 text-primary">
+                  {chat.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-foreground font-medium truncate">{chat.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{chat.lastMessage}</p>
+              </div>
+              <p className="text-xs text-muted-foreground flex-shrink-0">{chat.time}</p>
+            </div>
+          ))}
+        </ScrollArea>
+      </Card>
+
+      {/* Chat Area */}
+      {selectedChat !== null ? (
+        <Card className="flex-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl flex flex-col">
+          <CardHeader className="border-b border-border/30 p-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-t-xl sticky top-0 z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src={`/chat-${selectedChat}.jpg`} alt={chats[selectedChat].name} />
+                  <AvatarFallback className="bg-primary/20 text-primary">
+                    {chats[selectedChat].name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <CardTitle className="text-xl font-semibold text-foreground">
+                  {chats[selectedChat].name}
+                </CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                className="text-foreground hover:bg-primary/20 rounded-full p-2"
+              >
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </div>
+          </CardHeader>
+          <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+            <div className="space-y-4">
+              {messages
+                .filter((msg) => msg.chatId === selectedChat)
+                .map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={cn(
+                      "flex items-end gap-2",
+                      msg.isSent ? "justify-end" : "justify-start"
+                    )}
+                  >
+                    {!msg.isSent && (
+                      <Avatar className="w-8 h-8 flex-shrink-0">
+                        <AvatarImage src={`/user-${msg.sender}.jpg`} alt={msg.sender} />
+                        <AvatarFallback className="bg-primary/20 text-primary">
+                          {msg.sender.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    {msg.type === "message" ? (
+                      <div
+                        className={cn(
+                          "max-w-[70%] p-3 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md",
+                          msg.isSent
+                            ? "bg-gradient-to-r from-primary/80 to-primary/60 text-primary-foreground rounded-tr-none"
+                            : "bg-muted/70 text-foreground rounded-tl-none"
+                        )}
+                      >
+                        <p className="text-xs font-medium">{msg.sender}</p>
+                        <p className="text-sm mt-1">{renderMessageContent(msg.text || "")}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <p className="text-xs text-muted-foreground">{formatTimestamp(msg.time)}</p>
+                          {msg.isSent && (
+                            <CheckCheck
+                              className={cn(
+                                "h-4 w-4",
+                                msg.readBy?.length === 3 ? "text-primary" : "text-muted-foreground"
+                              )}
+                            />
+                          )}
+                        </div>
+                        {Object.keys(msg.reactions).length > 0 && (
+                          <div className="flex gap-1 mt-1">
+                            {Object.entries(msg.reactions).map(([userId, emoji]) => (
+                              <span key={userId} className="text-xs">{emoji}</span>
+                            ))}
+                          </div>
+                        )}
+                        <Select
+                          onValueChange={(emoji) => handleReactMessage(msg.id, emoji)}
+                        >
+                          <SelectTrigger className="w-10 h-6 p-0 border-none bg-transparent">
+                            <Smile className="h-4 w-4 text-muted-foreground" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["👍", "❤️", "😂"].map((emoji) => (
+                              <SelectItem key={emoji} value={emoji}>{emoji}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          "max-w-[70%] p-4 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md",
+                          msg.isSent
+                            ? "bg-gradient-to-r from-primary/10 to-secondary/10 text-foreground rounded-tr-none"
+                            : "bg-muted/70 text-foreground rounded-tl-none"
+                        )}
+                      >
+                        <p className="text-xs font-medium">{msg.sender}</p>
+                        <p className="text-sm font-semibold mt-1">{msg.poll?.question}</p>
+                        <div className="mt-3 space-y-2">
+                          {msg.poll?.options.map((opt, idx) => {
+                            const totalVotes = msg.poll?.options.reduce((sum, o) => sum + o.votes, 0) || 0;
+                            const percentage = totalVotes ? (opt.votes / totalVotes) * 100 : 0;
+                            const userVoted = msg.poll?.votes.some(
+                              (v) => v.userId === currentUserId && v.optionIdx === idx
+                            );
+                            return (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-2 p-2 bg-muted/50 rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-200"
+                                onClick={() => handleVote(msg.poll!.id, idx)}
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-foreground">
+                                      {idx + 1}. {opt.text}
+                                    </span>
+                                    {userVoted && <Check className="h-4 w-4 text-primary" />}
+                                  </div>
+                                  <div className="w-full bg-muted/30 h-1.5 rounded-full mt-1">
+                                    <div
+                                      className={cn(
+                                        "h-1.5 rounded-full",
+                                        userVoted ? "bg-primary/50" : "bg-primary/30"
+                                      )}
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+                                </div>
+                                <span className="text-xs text-muted-foreground">{opt.votes} votes</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="flex items-center gap-1 mt-2">
+                          <p className="text-xs text-muted-foreground">{formatTimestamp(msg.time)}</p>
+                          {msg.isSent && (
+                            <CheckCheck
+                              className={cn(
+                                "h-4 w-4",
+                                msg.readBy?.length === 3 ? "text-primary" : "text-muted-foreground"
+                              )}
+                            />
+                          )}
+                        </div>
+                        {Object.keys(msg.reactions).length > 0 && (
+                          <div className="flex gap-1 mt-1">
+                            {Object.entries(msg.reactions).map(([userId, emoji]) => (
+                              <span key={userId} className="text-xs">{emoji}</span>
+                            ))}
+                          </div>
+                        )}
+                        <Select
+                          onValueChange={(emoji) => handleReactMessage(msg.id, emoji)}
+                        >
+                          <SelectTrigger className="w-10 h-6 p-0 border-none bg-transparent">
+                            <Smile className="h-4 w-4 text-muted-foreground" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["👍", "❤️", "😂"].map((emoji) => (
+                              <SelectItem key={emoji} value={emoji}>{emoji}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    {msg.isSent && (
+                      <Avatar className="w-8 h-8 flex-shrink-0">
+                        <AvatarImage src="/user-you.jpg" alt="You" />
+                        <AvatarFallback className="bg-primary/20 text-primary">Y</AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
+                ))}
+              {isTyping && (
+                <div className="text-sm text-muted-foreground italic">Typing...</div>
+              )}
+            </div>
+          </ScrollArea>
+          <CardContent className="p-4 border-t border-border/30 bg-card/95">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => setShowPollDialog(true)}
+                className="text-foreground hover:bg-primary/20 rounded-full p-2"
+              >
+                <BarChart2 className="h-5 w-5" />
+              </Button>
+              <Input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 bg-muted/50 border-border rounded-full shadow-sm focus:ring-2 focus:ring-primary transition-all duration-300"
+                onKeyPress={(e) => e.key === "Enter" && handleSend()}
+              />
+              <Button
+                onClick={handleSend}
+                className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:bg-primary/90 rounded-full shadow-sm hover:shadow-md transition-all duration-300 p-2"
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setIsTyping(!isTyping)}
+                className="text-muted-foreground hover:bg-primary/20 rounded-full p-2"
+              >
+                Toggle Typing
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          Select a chat to start messaging
+        </div>
+      )}
+
+      {/* Poll Creation Dialog */}
+      <Dialog open={showPollDialog} onOpenChange={setShowPollDialog}>
+        <DialogContent className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Create Poll</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 p-4">
+            {pollError && <p className="text-destructive text-sm">{pollError}</p>}
+            <div>
+              <Label htmlFor="pollQuestion" className="text-foreground">Question</Label>
+              <Input
+                id="pollQuestion"
+                value={pollQuestion}
+                onChange={(e) => setPollQuestion(e.target.value)}
+                placeholder="Ask a question..."
+                className="bg-muted/50 border-border rounded-lg focus:ring-2 focus:ring-primary transition-all duration-300"
+              />
+            </div>
+            <div>
+              <Label className="text-foreground">Options</Label>
+              {pollOptions.map((opt, idx) => (
+                <div key={idx} className="flex items-center gap-2 mt-2">
+                  <Input
+                    value={opt}
+                    onChange={(e) => {
+                      const newOptions = [...pollOptions];
+                      newOptions[idx] = e.target.value;
+                      setPollOptions(newOptions);
+                    }}
+                    placeholder={`Option ${idx + 1}`}
+                    className="bg-muted/50 border-border rounded-lg focus:ring-2 focus:ring-primary transition-all duration-300"
+                  />
+                  {pollOptions.length > 2 && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                      className="text-destructive hover:bg-destructive/10 p-2"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button
+                onClick={() => setPollOptions([...pollOptions, ""])}
+                variant="outline"
+                className="mt-2 w-full border-border text-foreground hover:bg-primary/20 transition-all duration-300"
+              >
+                Add Option
+              </Button>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="allowMultiple" className="text-foreground">Allow multiple answers</Label>
+              <Switch
+                id="allowMultiple"
+                checked={allowMultiple}
+                onCheckedChange={setAllowMultiple}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowPollDialog(false)}
+                className="border-border text-foreground hover:bg-primary/20 transition-all duration-300"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreatePoll}
+                className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:bg-primary/90 rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
+              >
+                Create
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

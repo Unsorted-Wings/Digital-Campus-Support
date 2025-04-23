@@ -150,7 +150,7 @@ export default function FacultyGradebookPage() {
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
       {/* Header */}
       <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
-        <CardHeader className="p-4">
+        <CardHeader className="p-6">
           <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
             <BarChart className="h-6 w-6 text-primary" />
             Gradebook

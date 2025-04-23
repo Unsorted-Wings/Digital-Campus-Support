@@ -4,13 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Folder, Upload, Trash2, Download } from "lucide-react";
+import { Folder, Upload, Trash2, Download, ChevronUp, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Document {
   id: number;
@@ -26,9 +27,27 @@ export default function FacultyDocRepoPage() {
     { id: 2, name: "Physics Lab Guide", file: "/docs/physics-lab.pdf", uploaded: "2025-04-02", subject: "Mechanics" },
   ]);
 
+  const courses = [
+    {
+      name: "Mathematics",
+      subjects: [{ name: "Algebra" }, { name: "Calculus" }],
+    },
+    {
+      name: "Physics",
+      subjects: [{ name: "Mechanics" }, { name: "Thermodynamics" }],
+    },
+    {
+      name: "Computer Science",
+      subjects: [{ name: "Algorithms" }, { name: "Data Structures" }],
+    },
+  ];
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [newDocument, setNewDocument] = useState({ name: "", subject: "", file: null as File | null });
+  const [openCourses, setOpenCourses] = useState<Record<string, boolean>>(
+    Object.fromEntries(courses.map((course) => [course.name, false]))
+  );
 
   const subjects = [
     "Algebra",
@@ -39,7 +58,14 @@ export default function FacultyDocRepoPage() {
     "Data Structures",
   ];
 
-  const filteredDocuments = selectedSubject
+
+  const filteredDocuments = selectedCourse
+    ? selectedSubject
+      ? documents.filter((doc) => doc.subject === selectedSubject)
+      : documents.filter((doc) =>
+          courses.find((c) => c.name === selectedCourse)!.subjects.map((s) => s.name).includes(doc.subject)
+        )
+    : selectedSubject
     ? documents.filter((doc) => doc.subject === selectedSubject)
     : documents;
 
@@ -69,6 +95,10 @@ export default function FacultyDocRepoPage() {
     if (file) {
       setNewDocument((prev) => ({ ...prev, file }));
     }
+  };
+
+  const handleToggleCourse = (name: string, open: boolean) => {
+    setOpenCourses((prev) => ({ ...prev, [name]: open }));
   };
 
   return (
@@ -159,23 +189,47 @@ export default function FacultyDocRepoPage() {
             <div
               className={cn(
                 "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300 mb-2",
-                !selectedSubject && "bg-primary/20 border-l-4 border-primary"
+                !selectedCourse && !selectedSubject && "bg-primary/20 border-l-4 border-primary"
               )}
-              onClick={() => setSelectedSubject(null)}
+              onClick={() => { setSelectedCourse(null); setSelectedSubject(null); }}
             >
-              All Subjects
+              All Courses
             </div>
-            {subjects.map((subject) => (
-              <div
-                key={subject}
-                className={cn(
-                  "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
-                  selectedSubject === subject && "bg-primary/20 border-l-4 border-primary"
-                )}
-                onClick={() => setSelectedSubject(subject)}
+            {courses.map((course) => (
+              <Collapsible
+                key={course.name}
+                open={openCourses[course.name]}
+                onOpenChange={(open) => handleToggleCourse(course.name, open)}
+                className="mb-2"
               >
-                {subject}
-              </div>
+                <CollapsibleTrigger
+                  className={cn(
+                    "flex items-center justify-between w-full p-2 text-foreground rounded-md hover:bg-primary/10 transition-all duration-300",
+                    selectedCourse === course.name && !selectedSubject && "bg-primary/20 border-l-4 border-primary"
+                  )}
+                >
+                  <span>{course.name}</span>
+                  {openCourses[course.name] ? (
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="transition-all duration-300">
+                  {course.subjects.map((subject) => (
+                    <div
+                      key={subject.name}
+                      className={cn(
+                        "p-2 pl-6 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
+                        selectedCourse === course.name && selectedSubject === subject.name && "bg-primary/20 border-l-4 border-primary"
+                      )}
+                      onClick={() => { setSelectedCourse(course.name); setSelectedSubject(subject.name); }}
+                    >
+                      {subject.name}
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
             ))}
           </CardContent>
         </Card>
@@ -195,32 +249,40 @@ export default function FacultyDocRepoPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredDocuments.map((doc) => (
-                    <TableRow key={doc.id} className="hover:bg-primary/5 transition-all duration-300">
-                      <TableCell className="font-medium text-foreground">{doc.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{doc.file}</TableCell>
-                      <TableCell className="text-muted-foreground">{doc.uploaded}</TableCell>
-                      <TableCell className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => console.log(`Download ${doc.file}`)}
-                          className="border-border text-foreground hover:bg-primary/10"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveDocument(doc.id)}
-                          className="text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                  {filteredDocuments.length > 0 ? (
+                    filteredDocuments.map((doc) => (
+                      <TableRow key={doc.id} className="hover:bg-primary/5 transition-all duration-300">
+                        <TableCell className="font-medium text-foreground">{doc.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{doc.file}</TableCell>
+                        <TableCell className="text-muted-foreground">{doc.uploaded}</TableCell>
+                        <TableCell className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => console.log(`Download ${doc.file}`)}
+                            className="border-border text-foreground hover:bg-primary/10"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveDocument(doc.id)}
+                            className="text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        No documents available.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </ScrollArea>

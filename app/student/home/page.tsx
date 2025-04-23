@@ -64,16 +64,14 @@ export default function HomePage() {
           <div className="space-y-3">
             <Button
               variant="outline"
-              className="w-full mt-4 border-border text-foreground hover:bg-primary/10"
+              className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-lg transition-all duration-300"
             >
-              <Lock className="mr-2 h-4 w-4" />
               Change Password
             </Button>
             <Button
               variant="outline"
-              className="w-full mt-4 border-border text-foreground hover:bg-primary/10"
+              className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-lg transition-all duration-300"
             >
-              <LogOut className="mr-2 h-4 w-4" />
               Log Out
             </Button>
           </div>

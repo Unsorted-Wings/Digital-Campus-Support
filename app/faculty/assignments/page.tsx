@@ -7,10 +7,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, X, Trash2, Edit, File } from "lucide-react";
+import { FileText, Plus, X, Trash2, Edit, File, ChevronUp, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Assignment {
   id: number;
@@ -20,6 +21,25 @@ interface Assignment {
   document?: File | null;
   submissions: number;
   totalStudents: number;
+}
+
+interface Student {
+  id: number;
+  name: string;
+  sessional1?: number;
+  sessional2?: number;
+  attendance?: number;
+  assignments?: number;
+}
+
+interface Subject {
+  name: string;
+  students: Student[];
+}
+
+interface Course {
+  name: string;
+  subjects: Subject[];
 }
 
 interface Submission {
@@ -36,6 +56,62 @@ export default function FacultyAssignmentsPage() {
     { id: 2, title: "Physics Lab Report", course: "Physics 201", dueDate: "2025-04-08", document: null, submissions: 20, totalStudents: 25 },
     { id: 3, title: "CS Project", course: "CS 301", dueDate: "2025-04-15", document: null, submissions: 30, totalStudents: 35 },
   ]);
+   const [courses, setCourses] = useState<Course[]>([
+      {
+        name: "Mathematics 101",
+        subjects: [
+          {
+            name: "Algebra",
+            students: [
+              { id: 1, name: "John Doe", sessional1: undefined, sessional2: undefined, attendance: undefined, assignments: undefined },
+              { id: 2, name: "Jane Smith", sessional1: 8, sessional2: 9, attendance: 4, assignments: 3 },
+            ],
+          },
+          {
+            name: "Calculus",
+            students: [
+              { id: 1, name: "John Doe", sessional1: 7, sessional2: 8, attendance: 5, assignments: 4 },
+              { id: 2, name: "Jane Smith", sessional1: 9, sessional2: 7, attendance: 3, assignments: 5 },
+            ],
+          },
+        ],
+      },
+      {
+        name: "Physics 201",
+        subjects: [
+          {
+            name: "Mechanics",
+            students: [
+              { id: 3, name: "Alice Brown", sessional1: 7, sessional2: 6, attendance: 5, assignments: 4 },
+            ],
+          },
+          {
+            name: "Thermodynamics",
+            students: [
+              { id: 3, name: "Alice Brown", sessional1: 8, sessional2: 8, attendance: 4, assignments: 3 },
+            ],
+          },
+        ],
+      },
+      {
+        name: "CS 301",
+        subjects: [
+          {
+            name: "Algorithms",
+            students: [
+              { id: 4, name: "Bob Johnson", sessional1: 9, sessional2: 8, attendance: 3, assignments: 5 },
+            ],
+          },
+          {
+            name: "Data Structures",
+            students: [
+              { id: 4, name: "Bob Johnson", sessional1: 6, sessional2: 7, attendance: 4, assignments: 4 },
+            ],
+          },
+        ],
+      },
+    ]);
+  
 
   const [submissions, setSubmissions] = useState<{ [key: number]: Submission[] }>({
     1: [
@@ -48,11 +124,12 @@ export default function FacultyAssignmentsPage() {
   });
 
   const [selectedAssignment, setSelectedAssignment] = useState<number | null>(null);
+  const [openCourse, setOpenCourse] = useState<string>(""); // Added state for openCourse
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [editAssignment, setEditAssignment] = useState<Assignment | null>(null);
   const [newAssignment, setNewAssignment] = useState({ title: "", course: "", dueDate: "", document: null as File | null });
-  const courses = ["Mathematics 101", "Physics 201", "CS 301"];
 
   const filteredAssignments = selectedCourse
     ? assignments.filter((a) => a.course === selectedCourse)
@@ -80,7 +157,7 @@ export default function FacultyAssignmentsPage() {
             dueDate: newAssignment.dueDate,
             document: newAssignment.document,
             submissions: 0,
-            totalStudents: courses.find((c) => c === newAssignment.course) === "Mathematics 101" ? 30 : newAssignment.course === "Physics 201" ? 25 : 35,
+            totalStudents: newAssignment.course === "Mathematics 101" ? 30 : newAssignment.course === "Physics 201" ? 25 : 35,
           },
         ]);
         console.log("Added assignment:", newAssignment);
@@ -139,6 +216,12 @@ export default function FacultyAssignmentsPage() {
     console.log(`Graded ${studentId} for assignment ${assignmentId}: ${grade}`);
   };
 
+  function handleSubjectChange(courseName: string, subjectName: string) {
+    setSelectedCourse(courseName);
+    setSelectedSubject(subjectName);
+    console.log(`Selected Course: ${courseName}, Selected Subject: ${subjectName}`);
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
       {/* Header */}
@@ -183,7 +266,7 @@ export default function FacultyAssignmentsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {courses.map((course) => (
-                          <SelectItem key={course} value={course}>{course}</SelectItem>
+                          <SelectItem key={course.name} value={course.name}>{course.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -231,26 +314,40 @@ export default function FacultyAssignmentsPage() {
         {/* Sidebar */}
         <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl border-r border-border h-full overflow-y-auto">
           <CardContent className="p-4">
-            <div
-              className={cn(
-                "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300 mb-2",
-                !selectedCourse && "bg-primary/20 border-l-4 border-primary"
-              )}
-              onClick={() => setSelectedCourse(null)}
-            >
-              All Courses
-            </div>
             {courses.map((course) => (
-              <div
-                key={course}
-                className={cn(
-                  "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
-                  selectedCourse === course && "bg-primary/20 border-l-4 border-primary"
-                )}
-                onClick={() => setSelectedCourse(course)}
+              <Collapsible
+                key={course.name}
+                open={openCourse === course.name}
+                onOpenChange={() => setOpenCourse(openCourse === course.name ? "" : course.name)}
+                className="mb-2"
               >
-                {course}
-              </div>
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 text-foreground font-semibold text-lg hover:bg-primary/10 rounded-md transition-all duration-300">
+                  {course.name}
+                  {openCourse === course.name ? (
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                  {course.subjects.map((subject) => (
+                    <div
+                      key={subject.name}
+                      className={cn(
+                        "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
+                        selectedCourse === course.name && selectedSubject === subject.name &&
+                          "bg-primary/20 border-l-4 border-primary"
+                      )}
+                      onClick={() => {
+                        setSelectedCourse(course.name);
+                        setSelectedSubject(subject.name);
+                      }}
+                    >
+                      {subject.name}
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
             ))}
           </CardContent>
         </Card>

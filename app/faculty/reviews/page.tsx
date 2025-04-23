@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Star } from "lucide-react";
+import { ChevronDown, ChevronUp, MessageSquare, Star } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
@@ -159,7 +159,7 @@ export default function FacultyReviewsPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6">
       {/* Header */}
       <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
@@ -196,12 +196,17 @@ export default function FacultyReviewsPage() {
               >
                 <CollapsibleTrigger
                   className={cn(
-                    "w-full text-left p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
+                    "flex items-center justify-between w-full p-2 text-foreground font-semibold text-lg hover:bg-primary/10 rounded-md transition-all duration-300",
                     selectedCourse === course.name && !selectedSubject && "bg-primary/20 border-l-4 border-primary"
                   )}
                   onClick={() => { setSelectedCourse(course.name); setSelectedSubject(null); }}
                 >
                   {course.name}
+                  {openCourses[course.name] ? (
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  )}
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   {course.subjects.map((subject) => (

@@ -110,7 +110,7 @@ export default function SchedulePage() {
     const dayEvents = events.filter((event) => isSameDay(event.start, currentDate));
 
     return (
-      <ScrollArea className="h-full">
+      <ScrollArea className="h-full min-h-0">
         <div className="grid grid-cols-[80px_1fr] border-b border-border/50 bg-muted/50 p-2">
           <div className="text-center text-muted-foreground font-medium">Time</div>
           <div className="text-center text-muted-foreground font-medium">
@@ -159,7 +159,7 @@ export default function SchedulePage() {
     const weekDays = eachDayOfInterval({ start: weekStart, end: endOfWeek(weekStart, { weekStartsOn: 1 }) });
 
     return (
-      <ScrollArea className="h-full">
+      <ScrollArea className="h-full min-h-0">
         <div className="grid grid-cols-8 gap-1 border-b border-border/50 bg-muted/50 p-2">
           <div className="text-center text-muted-foreground font-medium">Time</div>
           {weekDays.map((day) => (
@@ -221,43 +221,45 @@ export default function SchedulePage() {
     while (paddedDays.length < totalCells) paddedDays.push(null);
 
     return (
-      <div className="grid grid-cols-7 gap-2 h-full">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-          <div key={day} className="text-center text-foreground font-semibold p-2 bg-muted/50 rounded-t-lg">
-            {day}
-          </div>
-        ))}
-        {paddedDays.map((day, idx) => {
-          if (!day) return <div key={idx} className="h-32 bg-muted/10 border border-border/20 rounded-lg" />;
-          const dayEvents = events.filter((event) => isSameDay(event.start, day));
-          return (
-            <div
-              key={day.toString()}
-              className={cn(
-                "h-32 p-2 bg-card border border-border/50 rounded-lg shadow-sm transition-all duration-300",
-                isToday(day) ? "bg-primary/10 border-primary shadow-md" : "hover:bg-primary/5"
-              )}
-            >
-              <p className={cn("text-sm font-medium text-foreground", isToday(day) && "text-primary")}>
-                {format(day, "d")}
-              </p>
-              <div className="mt-1 space-y-1">
-                {dayEvents.slice(0, 3).map((event) => (
-                  <div
-                    key={event.id}
-                    className="text-xs p-1 bg-gradient-to-r from-primary/80 to-primary/60 text-primary-foreground rounded-sm shadow-sm hover:bg-primary/90 truncate"
-                  >
-                    {format(event.start, "h:mm a")} - {event.title}
-                  </div>
-                ))}
-                {dayEvents.length > 3 && (
-                  <p className="text-xs text-muted-foreground">+{dayEvents.length - 3} more</p>
-                )}
-              </div>
+      <ScrollArea className="h-full min-h-0">
+        <div className="grid grid-cols-7 gap-2">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+            <div key={day} className="text-center text-foreground font-semibold p-2 bg-muted/50 rounded-t-lg">
+              {day}
             </div>
-          );
-        })}
-      </div>
+          ))}
+          {paddedDays.map((day, idx) => {
+            if (!day) return <div key={idx} className="h-32 bg-muted/10 border border-border/20 rounded-lg" />;
+            const dayEvents = events.filter((event) => isSameDay(event.start, day));
+            return (
+              <div
+                key={day.toString()}
+                className={cn(
+                  "h-32 p-2 bg-card border border-border/50 rounded-lg shadow-sm transition-all duration-300",
+                  isToday(day) ? "bg-primary/10 border-primary shadow-md" : "hover:bg-primary/5"
+                )}
+              >
+                <p className={cn("text-sm font-medium text-foreground", isToday(day) && "text-primary")}>
+                  {format(day, "d")}
+                </p>
+                <div className="mt-1 space-y-1">
+                  {dayEvents.slice(0, 3).map((event) => (
+                    <div
+                      key={event.id}
+                      className="text-xs p-1 bg-gradient-to-r from-primary/80 to-primary/60 text-primary-foreground rounded-sm shadow-sm hover:bg-primary/90 truncate"
+                    >
+                      {format(event.start, "h:mm a")} - {event.title}
+                    </div>
+                  ))}
+                  {dayEvents.length > 3 && (
+                    <p className="text-xs text-muted-foreground">+{dayEvents.length - 3} more</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </ScrollArea>
     );
   };
 
@@ -278,27 +280,27 @@ export default function SchedulePage() {
             <Button
               variant="outline"
               onClick={() => setCurrentDate(new Date())}
-              className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-full"
+              className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-lg"
             >
               Today
             </Button>
             <Button
               variant="outline"
               onClick={() => navigate("prev")}
-              className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-full px-2"
+              className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-lg px-2"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <Button
               variant="outline"
               onClick={() => navigate("next")}
-              className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-full px-2"
+              className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-lg px-2"
             >
               <ChevronRight className="h-5 w-5" />
             </Button>
             <Button
               onClick={() => setShowAddEvent(true)}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg"
             >
               <Plus className="h-5 w-5 mr-2" />
               Add Event
@@ -308,9 +310,9 @@ export default function SchedulePage() {
       </Card>
 
       {/* Calendar */}
-      <Card className="flex-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
+      <Card className="flex-1 bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden h-full min-h-0">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-secondary/5 opacity-30 pointer-events-none" />
-        <Tabs value={view} onValueChange={(v) => setView(v as typeof view)} className="h-full flex flex-col relative z-10">
+        <Tabs value={view} onValueChange={(v) => setView(v as typeof view)} className="flex flex-col h-full min-h-0 relative z-10">
           <TabsList className="grid grid-cols-3 w-full max-w-xs mx-auto bg-muted/50 rounded-xl p-1 mt-4">
             <TabsTrigger
               value="daily"
@@ -331,14 +333,14 @@ export default function SchedulePage() {
               Monthly
             </TabsTrigger>
           </TabsList>
-          <CardContent className="flex-1 p-6">
-            <TabsContent value="daily" className="h-full m-0">
+          <CardContent className="flex-1 p-6 flex flex-col h-full min-h-0">
+            <TabsContent value="daily" className="h-full m-0 flex-1">
               {renderDailyView()}
             </TabsContent>
-            <TabsContent value="weekly" className="h-full m-0">
+            <TabsContent value="weekly" className="h-full m-0 flex-1">
               {renderWeeklyView()}
             </TabsContent>
-            <TabsContent value="monthly" className="h-full m-0">
+            <TabsContent value="monthly" className="h-full m-0 flex-1">
               {renderMonthlyView()}
             </TabsContent>
           </CardContent>
