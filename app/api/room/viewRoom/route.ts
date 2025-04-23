@@ -11,14 +11,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2️⃣ Check if the user has admin role (ensure the token contains a 'role' field)
-    if (token.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     // 3️⃣ Retrieve all rooms from Firestore
     const snapshot = await firestore.collection("rooms").get();
-    const rooms = snapshot.docs.map((doc) => doc.data());
+    const rooms = snapshot.docs
+      .map((doc) => doc.data())
+      .filter((room: any) => room.members && room.members.includes(token.id));
 
     // 4️⃣ Return the list of rooms
     return NextResponse.json(rooms, { status: 200 });
