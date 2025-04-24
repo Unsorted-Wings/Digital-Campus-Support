@@ -1,32 +1,29 @@
+// app/api/resources/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt"; // Import the getToken function from NextAuth
-import { firestore } from "@/lib/firebase/firebaseAdmin"; // Assuming you have this db connection to Firestore
+import { getToken } from "next-auth/jwt";
+import { firestore } from "@/lib/firebase/firebaseAdmin";
 
-export async function GET(req: NextRequest) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    // 1️⃣ Get the token from the request using NextAuth's JWT helper
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    // 2️⃣ Check if the token exists, if not, return unauthorized
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!token || token.role !== "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // 3️⃣ Check if the user has an 'admin' role
-    if (token.role !== "admin") {
-      return NextResponse.json(
-        { error: "Only admins can view resources" },
-        { status: 403 }
-      );
+    const updates = await req.json();
+    updates.updatedAt = new Date().toISOString();
+
+    const resourceRef = firestore.collection("resources").doc(params.id);
+    const doc = await resourceRef.get();
+
+    if (!doc.exists) {
+      return NextResponse.json({ error: "Resource not found" }, { status: 404 });
     }
 
-    // 4️⃣ Fetch the resources from Firestore
-    const snapshot = await firestore.collection("resources").get();
-    const data = snapshot.docs.map((doc) => doc.data());
-
-    // 5️⃣ Return the resources
-    return NextResponse.json(data, { status: 200 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    await resourceRef.update(updates);
+    return NextResponse.json({ message: "Resource updated" }, { status: 200 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

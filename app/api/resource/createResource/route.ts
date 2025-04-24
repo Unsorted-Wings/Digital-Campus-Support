@@ -19,10 +19,10 @@ export async function POST(req: NextRequest) {
 
     // 4️⃣ Parse the body of the request
     const body = await req.json();
-    const { name, type, description, fileUrl } = body;
+    const { name, type, description, fileUrl,courseId,batchId,semesterId} = body;
 
     // 5️⃣ Validate required fields
-    if (!name || !type || !description || !fileUrl) {
+    if (!name || !type || !description || !fileUrl || !courseId || !batchId || !semesterId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -37,6 +37,9 @@ export async function POST(req: NextRequest) {
       description,
       createdBy: token.sub, // Use token.sub (which is the user ID) as createdBy
       fileUrl,
+      courseId,
+      batchId,
+      semesterId,
       createdAt: now,
       updatedAt: now,
     };

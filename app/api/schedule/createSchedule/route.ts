@@ -13,7 +13,10 @@ export async function POST(req: NextRequest) {
 
     // 2️⃣ Only admin users can create calendar events
     if (token.role !== "admin") {
-      return NextResponse.json({ error: "Only admin can create calendar events" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Only admin can create calendar events" },
+        { status: 403 }
+      );
     }
 
     // 3️⃣ Extract event details from request body
@@ -27,10 +30,14 @@ export async function POST(req: NextRequest) {
       status,
       visibility,
       recurring,
+      userIds,
     } = await req.json();
 
     if (!title || !start || allDay === undefined || !status || !visibility) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
     // 4️⃣ Prepare event object
@@ -39,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     const event = {
       id,
-      userId: token.sub, // user ID from NextAuth token
+      userIds, // user ID from NextAuth token
       title,
       description: description || "",
       start,
@@ -57,7 +64,6 @@ export async function POST(req: NextRequest) {
     // 5️⃣ Save to Firestore
     await firestore.collection("calendarEvents").doc(id).set(event);
     return NextResponse.json({ message: "Event created", id }, { status: 201 });
-
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

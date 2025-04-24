@@ -5,14 +5,43 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Bell, Calendar, Clock, LogOut } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { Bell, Calendar, Clock, LogOut, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { signOut } from "next-auth/react";
+import { format, parseISO } from "date-fns";
 
 export default function HomePage() {
   const router = useRouter();
+
   const [user, setUser] = useState<any>(null);
+  const [studentData, setStudentData] = useState<any>(null);
+  const [filteredEvents, setFilteredEvents] = useState<any[]>([]);
+  const fetchStudentData = async () => {
+    try {
+      const response = await fetch(
+        `/api/students/viewStudent/viewStudentCourseInfo?studentId=${user.uid}`
+      );
+      const data = await response.json();
+      // console.log("Student Data:", data);
+      setStudentData(data);
+    } catch (error) {
+      console.error("Error fetching student data:", error);
+    }
+  };
+
+  const fetchStudentSchedule = async () => {
+    try {
+      const response = await fetch(
+        `/api/schedule/viewSchedule/viewStudentSchedule/viewStudentTodaysSchedule?userId=${user.uid}`
+      );
+      const data = await response.json();
+      // console.log("Student Schedule:", data);
+      setFilteredEvents(data);
+    } catch (error) {
+      console.error("Error fetching student schedule:", error);
+    }
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -20,6 +49,14 @@ export default function HomePage() {
       setUser(JSON.parse(storedUser));
     }
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      console.log("User data:", user);
+      fetchStudentData();
+      fetchStudentSchedule();
+    }
+  }, [user]);
 
   const logOutClickHandler = async () => {
     console.log("Logging out...");
@@ -29,18 +66,26 @@ export default function HomePage() {
   };
 
   const profile = {
-    name: user?.name || "Jane Doe",
-    role: user?.role || "Student",
-    email: user?.email || "jane@doe.com",
+    name: user?.name || "",
+    role: "Student",
+    email: user?.email || "",
     avatar: "/avatar-placeholder.jpg",
+    rollNo: studentData?.rollNumber || "",
+    courseName: studentData?.courseName || "",
   };
 
-  const schedule = [
-    { time: "09:00 AM", event: "Mathematics Lecture", location: "Room 101" },
-    { time: "11:00 AM", event: "Physics Lab", location: "Lab B" },
-    { time: "02:00 PM", event: "Group Study", location: "Library" },
-    { time: "04:00 PM", event: "CS Seminar", location: "Auditorium" },
-  ];
+  // const schedule = [
+  //   { time: "09:00 AM", event: "Mathematics Lecture", location: "Room 101" },
+  //   { time: "11:00 AM", event: "Physics Lab", location: "Lab B" },
+  //   { time: "02:00 PM", event: "Group Study", location: "Library" },
+  //   { time: "04:00 PM", event: "CS Seminar", location: "Auditorium" },
+  // ];
+
+  const schedule = filteredEvents.map((event) => ({
+    time: format(parseISO(event.start), "hh:mm a"),
+    event: event.title,
+    location: event.location || "", // fallback to empty if not present
+  }));
 
   const notifications = [
     { title: "Assignment Due", due: "Tomorrow, 11:59 PM", type: "urgent" },
@@ -51,7 +96,7 @@ export default function HomePage() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-[1fr_2.5fr_1fr] gap-6">
       {/* Column 1: Profile Card */}
-      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl flex flex-col h-[calc(100vh-5rem)]">
+      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl flex flex-col h-[calc(100vh-5rem)] relative overflow-hidden">
         <CardHeader className="text-center border-b border-border">
           <Avatar className="w-20 h-20 mx-auto mb-4">
             <AvatarImage src={profile.avatar} alt={profile.name} />
@@ -70,21 +115,36 @@ export default function HomePage() {
               <span className="font-medium text-foreground">Email:</span>{" "}
               {profile.email}
             </div>
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Roll No:</span>{" "}
+              {profile.rollNo}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Course:</span>{" "}
+              {profile.courseName}
+            </div>
           </div>
-          <Button
-            variant="outline"
-            className="w-full mt-4 border-border text-foreground hover:bg-primary/10 cursor-pointer"
-            onClick={logOutClickHandler}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Log Out
-          </Button>
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-lg transition-all duration-300"
+            >
+              Change Password
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-lg transition-all duration-300"
+              onClick={logOutClickHandler}
+            >
+              Log Out
+            </Button>
+          </div>
         </CardContent>
-        <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-20 pointer-events-none" />
       </Card>
 
       {/* Column 2: Schedule */}
-      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl h-[calc(100vh-5rem)] overflow-y-auto">
+      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl h-[calc(100vh-5rem)] overflow-y-auto relative overflow-hidden">
         <CardHeader className="border-b border-border sticky top-0 bg-card/95 z-10">
           <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-2">
             <Calendar className="h-6 w-6 text-primary" />
@@ -98,7 +158,7 @@ export default function HomePage() {
                 key={index}
                 className="relative flex items-center justify-between p-4 bg-card rounded-lg shadow-md hover:shadow-xl hover:bg-card/90 transition-all duration-300 overflow-hidden"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/15 to-secondary/15 opacity-30 group-hover:opacity-40 transition-opacity duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/15 to-secondary/15 opacity-30 group-hover:opacity-40 transition-opacity duration-300 pointer-events-none" />
                 <div className="relative flex items-center gap-4">
                   <div className="flex-shrink-0 w-12 text-center">
                     <Badge
@@ -126,11 +186,11 @@ export default function HomePage() {
             </p>
           )}
         </CardContent>
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
       </Card>
 
       {/* Column 3: Notifications */}
-      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl h-[calc(100vh-5rem)] overflow-y-auto">
+      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl h-[calc(100vh-5rem)] overflow-y-auto relative overflow-hidden">
         <CardHeader className="border-b border-border sticky top-0 bg-card/95 z-10">
           <CardTitle className="text-xl font-semibold text-foreground flex items-center gap-2">
             <Bell className="h-5 w-5 text-primary" />
@@ -151,7 +211,7 @@ export default function HomePage() {
               >
                 <div
                   className={cn(
-                    "absolute inset-0 bg-gradient-to-r opacity-30 group-hover:opacity-40 transition-opacity duration-300",
+                    "absolute inset-0 bg-gradient-to-r opacity-30 group-hover:opacity-40 transition-opacity duration-300 pointer-events-none",
                     item.type === "urgent" &&
                       "from-destructive/20 to-transparent",
                     item.type === "warning" &&
@@ -181,7 +241,7 @@ export default function HomePage() {
             </p>
           )}
         </CardContent>
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-20 pointer-events-none" />
       </Card>
     </div>
   );

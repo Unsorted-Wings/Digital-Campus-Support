@@ -25,10 +25,6 @@ import { useState } from "react";
 export default function AssignmentSubmissionPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<number | null>(null);
-  const [uploading, setUploading] = useState(false); // State to track upload status
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-
   const [filterSubject, setFilterSubject] = useState<string>("All");
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [sortField, setSortField] = useState<string>("dueDate");
@@ -92,44 +88,12 @@ export default function AssignmentSubmissionPage() {
     }
   };
 
-  const handleSubmit = async (assignmentId: number) => {
-    if (!selectedFile) {
-      setUploadError("Please select a file to upload.");
-      return;
-    }
-    console.log('uploading...')
-    setUploading(true);
-    setUploadError(null);
-    setUploadSuccess(false);
-
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-    formData.append("assignmentId", assignmentId.toString()); // You might want to send the assignment ID
-
-    try {
-      const response = await fetch("/api/DocRepo/uploadAssignment", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Upload successful:", data);
-        setUploading(false);
-        setSelectedFile(null);
-        setSelectedAssignment(null);
-        setUploadSuccess(true);
-        // Optionally, update the assignment status in the UI
-      } else {
-        const errorData = await response.json();
-        console.error("Upload failed:", errorData);
-        setUploadError(errorData?.error || "Failed to upload file.");
-        setUploading(false);
-      }
-    } catch (error: any) {
-      console.error("Error during upload:", error);
-      setUploadError(error.message || "An unexpected error occurred.");
-      setUploading(false);
+  const handleSubmit = (assignmentId: number) => {
+    if (selectedFile) {
+      console.log(`Submitting ${selectedFile.name} for assignment ID ${assignmentId}`);
+      setSelectedFile(null);
+      setSelectedAssignment(null);
+      // Update status in real implementation
     }
   };
 
@@ -143,53 +107,15 @@ export default function AssignmentSubmissionPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6">
       {/* Header with Filters */}
       <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl">
-        <CardHeader className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <CardTitle className="text-3xl font-bold text-foreground">
+        <CardHeader className="p-4 gap-4">
+          <CardTitle className="text-3xl font-bold flex items-center gap-2 text-foreground">
+            
+          <FileText className="h-6 w-6 text-primary" />
             Assignment Submission
           </CardTitle>
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 border-border">
-                  <Filter className="h-5 w-5" />
-                  Subject: {filterSubject}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
-                {subjects.map((subject) => (
-                  <DropdownMenuItem
-                    key={subject}
-                    onClick={() => setFilterSubject(subject)}
-                    className="hover:bg-primary/10"
-                  >
-                    {subject}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 border-border">
-                  <Filter className="h-5 w-5" />
-                  Status: {filterStatus}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
-                {statuses.map((status) => (
-                  <DropdownMenuItem
-                    key={status}
-                    onClick={() => setFilterStatus(status)}
-                    className="hover:bg-primary/10"
-                  >
-                    {status}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
         </CardHeader>
       </Card>
 
@@ -199,10 +125,49 @@ export default function AssignmentSubmissionPage() {
         <Card className="lg:col-span-3 bg-card/95 backdrop-blur-md shadow-lg rounded-xl flex flex-col relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
           <CardHeader className="p-4 border-b border-border relative z-10">
-            <CardTitle className="text-xl font-semibold text-foreground flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
+            <CardTitle className="text-xl font-semibold text-foreground gap-2">
               Assignments
             </CardTitle>
+            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2 border-border">
+                    <Filter className="h-5 w-5" />
+                    Subject: {filterSubject}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
+                  {subjects.map((subject) => (
+                    <DropdownMenuItem
+                      key={subject}
+                      onClick={() => setFilterSubject(subject)}
+                      className="hover:bg-primary/10"
+                    >
+                      {subject}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2 border-border">
+                    <Filter className="h-5 w-5" />
+                    Status: {filterStatus}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
+                  {statuses.map((status) => (
+                    <DropdownMenuItem
+                      key={status}
+                      onClick={() => setFilterStatus(status)}
+                      className="hover:bg-primary/10"
+                    >
+                      {status}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </CardHeader>
           <ScrollArea className="flex-1 relative z-10 p-4">
             <Table>

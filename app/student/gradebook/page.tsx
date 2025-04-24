@@ -98,7 +98,7 @@ export default function GradebookPage() {
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
       {/* Header */}
       <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl">
-        <CardHeader className="p-4 flex items-center justify-between">
+        <CardHeader className="p-4 flex justify-between">
           <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
             <BookOpen className="h-6 w-6 text-primary" />
             Gradebook

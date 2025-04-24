@@ -39,7 +39,6 @@ export async function POST(req: NextRequest) {
     const facultyData = {
       id: facultyRef.id,
       email,
-      password: hashedPassword, // Store the hashed password
       name,
       qualification: qualification || "",
       isMentor,
@@ -55,6 +54,7 @@ export async function POST(req: NextRequest) {
       email,
       name,
       role: "faculty", // Set the role as 'faculty'
+      password: hashedPassword, // Store the hashed password
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

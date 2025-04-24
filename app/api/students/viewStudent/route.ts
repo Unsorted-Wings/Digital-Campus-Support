@@ -21,13 +21,16 @@ export async function GET(req: NextRequest) {
     const studentId = url.searchParams.get("studentId");
 
     if (!studentId) {
-      return NextResponse.json({ error: "Missing student ID" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing student ID" },
+        { status: 400 }
+      );
     }
 
     // 3️⃣ Fetch the User and Student Documents
     const [userDoc, studentDoc] = await Promise.all([
       firestore.collection("users").doc(studentId).get(),
-      firestore.collection("students").doc(studentId).get()
+      firestore.collection("students").doc(studentId).get(),
     ]);
 
     if (!userDoc.exists || !studentDoc.exists) {
@@ -38,71 +41,85 @@ export async function GET(req: NextRequest) {
     const studentData = studentDoc.data();
 
     if (!userData || !studentData) {
-      return NextResponse.json({ error: "Student data is missing or incomplete" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Student data is missing or incomplete" },
+        { status: 404 }
+      );
     }
 
     // 4️⃣ Return Full Data for Admin
     if (requesterRole === "admin") {
-      return NextResponse.json({
+      return NextResponse.json(
+        {
+          user: {
+            id: userData.id,
+            email: userData.email,
+            name: userData.name,
+            role: userData.role,
+            profilePicture: userData.profilePicture,
+            createdAt: userData.createdAt,
+            updatedAt: userData.updatedAt,
+          },
+          student: {
+            id: studentData.id,
+            rollNumber: studentData.rollNumber,
+            courseId: studentData.course,
+            batchId: studentData.batchId,
+            description: studentData.description || "",
+            isAlumni: studentData.isAlumni ?? false,
+            createdAt: studentData.createdAt,
+            updatedAt: studentData.updatedAt,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
+    // 5️⃣ Return Partial Data if Student is viewing themselves
+    if (requesterId === studentId) {
+      return NextResponse.json(
+        {
+          user: {
+            id: userData.id,
+            email: userData.email,
+            name: userData.name,
+            role: userData.role,
+            profilePicture: userData.profilePicture,
+            createdAt: userData.createdAt,
+            updatedAt: userData.updatedAt,
+          },
+          student: {
+            id: studentData.id,
+            rollNumber: studentData.rollNumber,
+            courseId: studentData.course,
+            batchId: studentData.batchId,
+            createdAt: studentData.createdAt,
+            updatedAt: studentData.updatedAt,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
+    // 6️⃣ Return Public Info for other users
+    return NextResponse.json(
+      {
         user: {
           id: userData.id,
           email: userData.email,
           name: userData.name,
           role: userData.role,
           profilePicture: userData.profilePicture,
-          createdAt: userData.createdAt,
-          updatedAt: userData.updatedAt,
         },
         student: {
           id: studentData.id,
           rollNumber: studentData.rollNumber,
           courseId: studentData.course,
           batchId: studentData.batchId,
-          description: studentData.description || "",
-          isAlumni: studentData.isAlumni ?? false,
-          createdAt: studentData.createdAt,
-          updatedAt: studentData.updatedAt,
         },
-      }, { status: 200 });
-    }
-
-    // 5️⃣ Return Partial Data if Student is viewing themselves
-    if (requesterId === studentId) {
-      return NextResponse.json({
-        user: {
-          id: userData.id,
-          email: userData.email,
-          name: userData.name,
-          profilePicture: userData.profilePicture,
-          createdAt: userData.createdAt,
-          updatedAt: userData.updatedAt,
-        },
-        student: {
-          id: studentData.id,
-          rollNumber: studentData.rollNumber,
-          courseId: studentData.course,
-          batchId: studentData.batchId,
-          createdAt: studentData.createdAt,
-          updatedAt: studentData.updatedAt,
-        },
-      }, { status: 200 });
-    }
-
-    // 6️⃣ Return Public Info for other users
-    return NextResponse.json({
-      user: {
-        id: userData.id,
-        email: userData.email,
-        name: userData.name,
       },
-      student: {
-        id: studentData.id,
-        rollNumber: studentData.rollNumber,
-        courseId: studentData.course,
-        batchId: studentData.batchId,
-      },
-    }, { status: 200 });
-
+      { status: 200 }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

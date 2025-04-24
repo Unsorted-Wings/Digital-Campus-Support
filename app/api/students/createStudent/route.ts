@@ -20,7 +20,6 @@ export async function POST(req: NextRequest) {
     // 2️⃣ Extract request data
     const {
       email,
-
       name,
       rollNumber,
       courseId,
@@ -40,7 +39,7 @@ export async function POST(req: NextRequest) {
     const studentId = studentRef.id;
 
     // 4️⃣ Hash the password
-    const password = process.env.DEFAULT_STUDENT_PASSWORD || "defaultPassword";
+    const password = process.env.DEFAULT_STUDENT_PASSWORD || "Student@1292";
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 5️⃣ Create student record

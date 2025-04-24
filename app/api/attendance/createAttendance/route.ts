@@ -24,7 +24,6 @@ export async function POST(req: NextRequest) {
       batchId,
       semesterId,
       studentId,
-      averagePercentage,
       subjects,
     } = await req.json();
 
@@ -41,7 +40,6 @@ export async function POST(req: NextRequest) {
       batchId,
       semesterId,
       studentId,
-      averagePercentage,
       subjects,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

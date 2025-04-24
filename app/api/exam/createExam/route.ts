@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt"; 
+import { getToken } from "next-auth/jwt";
 import { firestore } from "@/lib/firebase/firebaseAdmin";
 
 export async function POST(req: NextRequest) {
@@ -22,15 +22,20 @@ export async function POST(req: NextRequest) {
     }
 
     // 3️⃣ Parse Request Body
-    const { name, courseId, batchId, semesterId, scheduleUrl, marks } =
-      await req.json();
+    const {
+      name,
+      courseId,
+      batchId,
+      semesterId,
+      scheduleUrl = "",
+      marks = [],
+    } = await req.json();
 
     if (
       !name ||
       !courseId ||
       !batchId ||
       !semesterId ||
-      !scheduleUrl ||
       !Array.isArray(marks)
     ) {
       return NextResponse.json(
