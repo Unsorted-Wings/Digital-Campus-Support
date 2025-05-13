@@ -49,6 +49,7 @@ import {
   isEqual,
   set,
 } from "date-fns";
+import { title } from "process";
 
 export default function SchedulePage() {
   const [view, setView] = useState<"daily" | "weekly" | "monthly">("weekly");
@@ -203,7 +204,7 @@ export default function SchedulePage() {
       );
       const data = await response.json();
       console.log("Student Subjects Data:", data);
-      setStudentSubjects(data.subjects);
+      setStudentSubjects(data.simplifiedSubjects);
     } catch (error) {
       console.error("Error fetching student subjects:", error);
     }
@@ -239,6 +240,8 @@ export default function SchedulePage() {
       setUser(JSON.parse(storedUser));
     }
   }, []);
+
+  console.log(studentSubjects);
 
   const subjects = ["Mathematics", "Physics", "Computer Science", "General"];
 
@@ -312,6 +315,13 @@ export default function SchedulePage() {
     setShowAddEvent(false);
     setEventError("");
     console.log("Added event:", newEventData);
+    const dataToSend = {
+      userId: user.uid,
+      title: newEventData.title,
+      start: newEventData.start,
+      end: newEventData.end,
+      subject: newEvent.subject,
+    };
   };
 
   const expandedEvents = expandRecurringEvents(events);
@@ -690,9 +700,9 @@ export default function SchedulePage() {
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
                 <SelectContent>
-                  {subjects.map((subject) => (
-                    <SelectItem key={subject} value={subject}>
-                      {subject}
+                  {studentSubjects.map((subject) => (
+                    <SelectItem key={subject.id} value={subject.id}>
+                      {subject.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

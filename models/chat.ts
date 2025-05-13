@@ -1,6 +1,7 @@
 export type Chat = {
     id: string;
     senderId: string;
+    senderName: string;
     message: string;
     roomId: string;
     type: string;

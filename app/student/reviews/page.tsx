@@ -60,6 +60,8 @@ export default function StudentFacultyReviewPage() {
   const [user, setUser] = useState<any>(null);
   const [studentCourseData, setStudentCourseData] = useState<any>(null);
 
+  const [studentSubjectData, setStudentSubjectData] = useState<any[]>([]);
+
   const fetchStudentCourseDetails = async () => {
     try {
       const response = await fetch(
@@ -74,19 +76,17 @@ export default function StudentFacultyReviewPage() {
   };
 
   const fetchSubjectDetails = async () => {
-    try{
+    try {
       const response = await fetch(
-        `/api/semesterSubjects/viewSemesterSubject/viewCourseSubjects?batchId=${studentCourseData.batchId}`
+        `/api/semesterSubjects/viewSemesterSubject/viewCourseSubjects?studentId=${user.uid}`
       );
       const data = await response.json();
       console.log("Subject Details:", data);
-
-    }
-    catch (error) {
+      setStudentSubjectData(data);
+    } catch (error) {
       console.error("Error fetching subject details:", error);
     }
-
-  }
+  };
 
   useEffect(() => {
     if (user) {
@@ -94,10 +94,9 @@ export default function StudentFacultyReviewPage() {
     }
   }, [user]);
 
-  useEffect(()=>{
-    fetchSubjectDetails()
-
-  },[studentCourseData])
+  useEffect(() => {
+    fetchSubjectDetails();
+  }, [studentCourseData]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -105,11 +104,18 @@ export default function StudentFacultyReviewPage() {
       setUser(JSON.parse(storedUser));
     }
   }, []);
-  const [facultyList] = useState<Faculty[]>([
-    { id: 1, name: "Dr. John Smith" },
-    { id: 2, name: "Prof. Jane Doe" },
-    { id: 3, name: "Dr. Alan Brown" },
-  ]);
+  const facultyList: Faculty[] = Array.from(
+    new Map(
+      studentSubjectData.map((s) => [
+        s.teacherId,
+        { id: s.teacherId, name: s.teacherName },
+      ])
+    ).values()
+  );
+  const filteredSubjects = studentSubjectData.filter(
+    (s) => s.teacherId === selectedFaculty
+  );
+  
 
   const [courses] = useState<Course[]>([
     {

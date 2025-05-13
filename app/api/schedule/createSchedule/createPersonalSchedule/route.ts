@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     // 4️⃣ Prepare event object
     const id = firestore.collection("calendarEvents").doc().id;
     const now = new Date().toISOString();
-
+   
     const event = {
       id,
       userIds, // user ID from NextAuth token
