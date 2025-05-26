@@ -3,6 +3,7 @@ import { v2 as cloudinary } from "cloudinary";
 // import multer from "multer";
 import { Readable } from "stream";
 import { firestore ,admin} from "@/lib/firebase/firebaseAdmin";
+import { getToken } from "next-auth/jwt"; 
 
 
 cloudinary.config({
@@ -22,6 +23,18 @@ function bufferToStream(buffer: Buffer): Readable {
 // Middleware: parses multipart/form-data (Node.js built-in workaround)
 export async function POST(req: NextRequest) {
   try {
+     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    
+        if (!token) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+    
+        // Verify if the user has the "admin" role
+        const { role } = token; // Assuming the role is included in the JWT token
+        // if (role !== "admin") {
+        //   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        // }
+    
     const formData = await req.formData();
     const file = formData.get("file") as File;
 
