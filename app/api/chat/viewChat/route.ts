@@ -36,6 +36,8 @@ export async function GET(req: NextRequest) {
         timestamp: message.timestamp,
         createdAt: message.createdAt,
         updatedAt: message.updatedAt,
+        readBy: message.readBy || [],
+        reaction: message.reaction || {}
       };
     });
 

@@ -395,7 +395,7 @@ export default function ChatPage() {
                   >
                     {!msg.isSent && (
                       <Avatar className="w-8 h-8 flex-shrink-0">
-                        <AvatarImage src={`/user-${msg.sender}.jpg`} alt={msg.sender} />
+                        <AvatarImage src={`/user-${msg.senderId}.jpg`} alt={msg.senderName} />
                         <AvatarFallback className="bg-primary/20 text-primary">
                           {msg.senderName.charAt(0)}
                         </AvatarFallback>
