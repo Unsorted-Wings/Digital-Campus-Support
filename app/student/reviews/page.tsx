@@ -59,7 +59,7 @@ interface Review {
 export default function StudentFacultyReviewPage() {
   const [user, setUser] = useState<any>(null);
   const [studentCourseData, setStudentCourseData] = useState<any>(null);
-
+  const [selectedFaculty, setSelectedFaculty] = useState<string>("");
   const [studentSubjectData, setStudentSubjectData] = useState<any[]>([]);
 
   const fetchStudentCourseDetails = async () => {
@@ -68,7 +68,6 @@ export default function StudentFacultyReviewPage() {
         `/api/batch/viewBatch/viewStudentBatchDetail?studentId=${user.uid}`
       );
       const data = await response.json();
-      console.log("Student Course Details:", data);
       setStudentCourseData(data);
     } catch (error) {
       console.error("Error fetching student course details:", error);
@@ -81,7 +80,6 @@ export default function StudentFacultyReviewPage() {
         `/api/semesterSubjects/viewSemesterSubject/viewCourseSubjects?studentId=${user.uid}`
       );
       const data = await response.json();
-      console.log("Subject Details:", data);
       setStudentSubjectData(data);
     } catch (error) {
       console.error("Error fetching subject details:", error);
@@ -95,8 +93,10 @@ export default function StudentFacultyReviewPage() {
   }, [user]);
 
   useEffect(() => {
-    fetchSubjectDetails();
-  }, [studentCourseData]);
+    if (user?.uid) {
+      fetchSubjectDetails();
+    }
+  }, [studentCourseData, user]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -112,10 +112,12 @@ export default function StudentFacultyReviewPage() {
       ])
     ).values()
   );
+
+  console.log(studentSubjectData);
+
   const filteredSubjects = studentSubjectData.filter(
     (s) => s.teacherId === selectedFaculty
   );
-  
 
   const [courses] = useState<Course[]>([
     {
@@ -133,7 +135,6 @@ export default function StudentFacultyReviewPage() {
   ]);
 
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [selectedFaculty, setSelectedFaculty] = useState<string>("");
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [selectedSubject, setSelectedSubject] = useState<string>("");
   const [ratings, setRatings] = useState({
@@ -253,9 +254,8 @@ export default function StudentFacultyReviewPage() {
           tabIndex={0}
         >
           {[...Array(5)].map((_, i) => (
-            <span title={ratingLabels[i]}>
+            <span key={i} title={ratingLabels[i]}>
               <Star
-                key={i}
                 className={cn(
                   "h-6 w-6 cursor-pointer transition-all duration-300",
                   i < currentRating

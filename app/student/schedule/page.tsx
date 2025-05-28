@@ -47,7 +47,7 @@ import {
   parseISO,
   isBefore,
   isEqual,
-  set,
+  startOfDay,
 } from "date-fns";
 import { title } from "process";
 
@@ -195,15 +195,13 @@ export default function SchedulePage() {
     };
   }
 
-  // Convert RRULE day codes to JS index (SU = 0, MO = 1, etc.)
-
   const fetchStudentSubjects = async () => {
     try {
       const response = await fetch(
         `/api/subjects/viewSubject/viewStudentSubjects?studentId=${user.uid}`
       );
       const data = await response.json();
-      console.log("Student Subjects Data:", data);
+
       setStudentSubjects(data.simplifiedSubjects);
     } catch (error) {
       console.error("Error fetching student subjects:", error);
@@ -218,7 +216,6 @@ export default function SchedulePage() {
             `/api/schedule/viewSchedule/viewStudentSchedule?userId=${user.uid}`
           );
           const data = await response.json();
-          console.log("Student Data:", data);
 
           setStudentData(data);
 
@@ -240,8 +237,6 @@ export default function SchedulePage() {
       setUser(JSON.parse(storedUser));
     }
   }, []);
-
-  console.log(studentSubjects);
 
   const subjects = ["Mathematics", "Physics", "Computer Science", "General"];
 
@@ -314,7 +309,7 @@ export default function SchedulePage() {
     setNewEvent({ title: "", start: "", end: "", subject: "" });
     setShowAddEvent(false);
     setEventError("");
-    console.log("Added event:", newEventData);
+
     const dataToSend = {
       userId: user.uid,
       title: newEventData.title,
@@ -329,8 +324,11 @@ export default function SchedulePage() {
   const renderDailyView = () => {
     const hours = Array.from({ length: 24 }, (_, i) => i);
     const dayEvents = expandedEvents.filter((event) =>
-      isSameDay(event.start, currentDate)
+      isSameDay(startOfDay(event.start), startOfDay(currentDate))
     );
+
+    console.log(expandedEvents);
+    console.log("Day Events:", dayEvents);
 
     return (
       <ScrollArea className="h-full min-h-0">

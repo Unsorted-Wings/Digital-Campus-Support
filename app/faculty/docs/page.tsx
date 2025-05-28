@@ -1,17 +1,48 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Folder, Upload, Trash2, Download, ChevronUp, ChevronDown } from "lucide-react";
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Folder,
+  Upload,
+  Trash2,
+  Download,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
+import { use, useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { set } from "date-fns";
 
 interface Document {
   id: number;
@@ -22,9 +53,77 @@ interface Document {
 }
 
 export default function FacultyDocRepoPage() {
+  const [user, setUser] = useState<{
+    id: string;
+    name: string;
+    role: string;
+  } | null>(null);
+
+  const [subjectData, setSubjectData] = useState<
+    {
+      courseId: string;
+      courseName: string;
+      batchId: string;
+      batchName: string;
+      subjectId: string;
+      subjectName: string;
+    }[]
+  >([]);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        console.log("Parsed user from localStorage:", parsed);
+        setUser({
+          id: parsed.uid,
+          name: parsed.name,
+          role: parsed.role,
+        });
+      } catch (err) {
+        console.error("Error parsing user from localStorage:", err);
+      }
+    }
+  }, []);
+
+  const fetchSubjects = async () => {
+    try {
+      console.log(user);
+      const response = await fetch(
+        `/api/subjects/viewSubject/viewCourseWiseSubjects?teacherId=${user?.id}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch subjects");
+      }
+      const data = await response.json();
+      setSubjectData(data);
+      console.log(data);
+    } catch (error) {
+      console.error("Error fetching subjects:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    fetchSubjects();
+  }, [user]);
+
   const [documents, setDocuments] = useState<Document[]>([
-    { id: 1, name: "Math Lecture Notes", file: "/docs/math-lecture.pdf", uploaded: "2025-04-01", subject: "Algebra" },
-    { id: 2, name: "Physics Lab Guide", file: "/docs/physics-lab.pdf", uploaded: "2025-04-02", subject: "Mechanics" },
+    {
+      id: 1,
+      name: "Math Lecture Notes",
+      file: "/docs/math-lecture.pdf",
+      uploaded: "2025-04-01",
+      subject: "Algebra",
+    },
+    {
+      id: 2,
+      name: "Physics Lab Guide",
+      file: "/docs/physics-lab.pdf",
+      uploaded: "2025-04-02",
+      subject: "Mechanics",
+    },
   ]);
 
   const courses = [
@@ -44,7 +143,11 @@ export default function FacultyDocRepoPage() {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
-  const [newDocument, setNewDocument] = useState({ name: "", subject: "", file: null as File | null });
+  const [newDocument, setNewDocument] = useState({
+    name: "",
+    subject: "",
+    file: null as File | null,
+  });
   const [openCourses, setOpenCourses] = useState<Record<string, boolean>>(
     Object.fromEntries(courses.map((course) => [course.name, false]))
   );
@@ -58,12 +161,58 @@ export default function FacultyDocRepoPage() {
     "Data Structures",
   ];
 
+  const groupedCourses = subjectData?.reduce(
+    (
+      acc: {
+        name: string;
+        courseId: string;
+        batchId: string;
+        subjects: { id: string; name: string }[];
+      }[],
+      item
+    ) => {
+      const combinedName = `${item.courseName} - ${item.batchName}`;
+      const key = `${item.courseId}-${item.batchId}`; // Unique key for course+batch
+
+      const existing = acc.find(
+        (entry) =>
+          entry.courseId === item.courseId && entry.batchId === item.batchId
+      );
+
+      const subject = {
+        id: item.subjectId,
+        name: item.subjectName,
+      };
+
+      if (existing) {
+        const alreadyExists = existing.subjects.some(
+          (s) => s.id === subject.id
+        );
+        if (!alreadyExists) {
+          existing.subjects.push(subject);
+        }
+      } else {
+        acc.push({
+          name: combinedName,
+          courseId: item.courseId,
+          batchId: item.batchId,
+          subjects: [subject],
+        });
+      }
+
+      return acc;
+    },
+    []
+  );
 
   const filteredDocuments = selectedCourse
     ? selectedSubject
       ? documents.filter((doc) => doc.subject === selectedSubject)
       : documents.filter((doc) =>
-          courses.find((c) => c.name === selectedCourse)!.subjects.map((s) => s.name).includes(doc.subject)
+          courses
+            .find((c) => c.name === selectedCourse)!
+            .subjects.map((s) => s.name)
+            .includes(doc.subject)
         )
     : selectedSubject
     ? documents.filter((doc) => doc.subject === selectedSubject)
@@ -121,24 +270,37 @@ export default function FacultyDocRepoPage() {
               </DialogTrigger>
               <DialogContent className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl">
                 <DialogHeader>
-                  <DialogTitle className="text-foreground">Upload Document</DialogTitle>
+                  <DialogTitle className="text-foreground">
+                    Upload Document
+                  </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 p-4">
                   <div>
-                    <Label htmlFor="name" className="text-foreground">Document Name</Label>
+                    <Label htmlFor="name" className="text-foreground">
+                      Document Name
+                    </Label>
                     <Input
                       id="name"
                       value={newDocument.name}
-                      onChange={(e) => setNewDocument((prev) => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) =>
+                        setNewDocument((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
                       placeholder="Enter document name"
                       className="bg-muted/50 border-border rounded-md"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="subject" className="text-foreground">Subject</Label>
+                    <Label htmlFor="subject" className="text-foreground">
+                      Subject
+                    </Label>
                     <Select
                       value={newDocument.subject}
-                      onValueChange={(value) => setNewDocument((prev) => ({ ...prev, subject: value }))}
+                      onValueChange={(value) =>
+                        setNewDocument((prev) => ({ ...prev, subject: value }))
+                      }
                     >
                       <SelectTrigger className="bg-muted/50 border-border rounded-md">
                         <SelectValue placeholder="Select subject" />
@@ -153,7 +315,9 @@ export default function FacultyDocRepoPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="file" className="text-foreground">Document File</Label>
+                    <Label htmlFor="file" className="text-foreground">
+                      Document File
+                    </Label>
                     <Input
                       id="file"
                       type="file"
@@ -170,7 +334,11 @@ export default function FacultyDocRepoPage() {
                   <Button
                     onClick={handleUpload}
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
-                    disabled={!newDocument.name || !newDocument.subject || !newDocument.file}
+                    disabled={
+                      !newDocument.name ||
+                      !newDocument.subject ||
+                      !newDocument.file
+                    }
                   >
                     Upload
                   </Button>
@@ -189,13 +357,18 @@ export default function FacultyDocRepoPage() {
             <div
               className={cn(
                 "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300 mb-2",
-                !selectedCourse && !selectedSubject && "bg-primary/20 border-l-4 border-primary"
+                !selectedCourse &&
+                  !selectedSubject &&
+                  "bg-primary/20 border-l-4 border-primary"
               )}
-              onClick={() => { setSelectedCourse(null); setSelectedSubject(null); }}
+              onClick={() => {
+                setSelectedCourse(null);
+                setSelectedSubject(null);
+              }}
             >
               All Courses
             </div>
-            {courses.map((course) => (
+            {groupedCourses.map((course) => (
               <Collapsible
                 key={course.name}
                 open={openCourses[course.name]}
@@ -205,7 +378,9 @@ export default function FacultyDocRepoPage() {
                 <CollapsibleTrigger
                   className={cn(
                     "flex items-center justify-between w-full p-2 text-foreground rounded-md hover:bg-primary/10 transition-all duration-300",
-                    selectedCourse === course.name && !selectedSubject && "bg-primary/20 border-l-4 border-primary"
+                    selectedCourse === course.name &&
+                      !selectedSubject &&
+                      "bg-primary/20 border-l-4 border-primary"
                   )}
                 >
                   <span>{course.name}</span>
@@ -221,9 +396,14 @@ export default function FacultyDocRepoPage() {
                       key={subject.name}
                       className={cn(
                         "p-2 pl-6 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
-                        selectedCourse === course.name && selectedSubject === subject.name && "bg-primary/20 border-l-4 border-primary"
+                        selectedCourse === course.name &&
+                          selectedSubject === subject.name &&
+                          "bg-primary/20 border-l-4 border-primary"
                       )}
-                      onClick={() => { setSelectedCourse(course.name); setSelectedSubject(subject.name); }}
+                      onClick={() => {
+                        setSelectedCourse(course.name);
+                        setSelectedSubject(subject.name);
+                      }}
                     >
                       {subject.name}
                     </div>
@@ -251,10 +431,19 @@ export default function FacultyDocRepoPage() {
                 <TableBody>
                   {filteredDocuments.length > 0 ? (
                     filteredDocuments.map((doc) => (
-                      <TableRow key={doc.id} className="hover:bg-primary/5 transition-all duration-300">
-                        <TableCell className="font-medium text-foreground">{doc.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{doc.file}</TableCell>
-                        <TableCell className="text-muted-foreground">{doc.uploaded}</TableCell>
+                      <TableRow
+                        key={doc.id}
+                        className="hover:bg-primary/5 transition-all duration-300"
+                      >
+                        <TableCell className="font-medium text-foreground">
+                          {doc.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {doc.file}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {doc.uploaded}
+                        </TableCell>
                         <TableCell className="flex gap-2">
                           <Button
                             variant="outline"
@@ -278,7 +467,10 @@ export default function FacultyDocRepoPage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      <TableCell
+                        colSpan={4}
+                        className="text-center text-muted-foreground"
+                      >
                         No documents available.
                       </TableCell>
                     </TableRow>

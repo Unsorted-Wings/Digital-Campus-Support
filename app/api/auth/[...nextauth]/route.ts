@@ -30,11 +30,14 @@ const handler = NextAuth({
         const userDoc = snapshot.docs[0];
         const user = userDoc.data();
 
+        console.log("Stored hash:", user.password);
+        console.log("Entered password:", password);
         const isValid = await compare(password, user.password);
+        console.log("Password match:", isValid);
         if (!isValid) return null;
 
         return {
-          id: user.id,
+          id: userDoc.id,
           email: user.email,
           name: user.name,
           role: user.role,
