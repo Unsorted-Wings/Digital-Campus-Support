@@ -14,38 +14,45 @@ import { Send, Search, MoreVertical, BarChart2, CheckCheck, X, Smile, Check } fr
 import { useState, useEffect, useRef } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import Link from "next/link";
-
-interface Chat {
-  id: number;
-  name: string;
-  lastMessage: string;
-  time: string;
-}
-
-interface Poll {
-  id: number;
-  question: string;
-  options: { text: string; votes: number }[];
-  allowMultiple: boolean;
-  votes: { userId: number; optionIdx: number }[];
-}
+import { Room } from "@/models/room";
+import { realtimeDB } from "@/lib/firebase/firebaseConfig";
+import { ref, onValue } from "firebase/database";
+import { read } from "fs";
 
 interface Message {
-  id: number;
-  chatId: number;
+  id: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+  roomId: string;
   type: "message" | "poll";
-  sender: string;
-  senderId: number;
-  text?: string;
-  time: string;
+  timestamp: string;
   isSent: boolean;
-  readBy: number[];
-  reactions: { [userId: number]: string };
-  poll?: Poll;
+  reactions: {
+    [emoji: string]: string[];
+  };
+  createdAt: string;
+  updatedAt: string;
+  readBy?: string[];
+
+  pollOptions?: {
+    id: string;
+    text: string;
+    votes: string[];
+  }[];
+  allowsMultipleVotes?: boolean;
 }
 
+interface User {
+  uid: string;
+  email: string;
+  name: string;
+  role: string;
+};
+
 export default function ChatPage() {
-  const [selectedChat, setSelectedChat] = useState<number | null>(0);
+  const [user, setUser] = useState<User | null>(null);
+  const [selectedChat, setSelectedChat] = useState<Room | null>(null);
   const [message, setMessage] = useState("");
   const [showPollDialog, setShowPollDialog] = useState(false);
   const [pollQuestion, setPollQuestion] = useState("");
@@ -54,115 +61,79 @@ export default function ChatPage() {
   const [pollError, setPollError] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [rooms, setRooms] = useState<Room[] | null>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
-  const chats: Chat[] = [
-    { id: 0, name: "Study Group", lastMessage: "Hey, let’s meet at 2 PM!", time: "12:30 PM" },
-    { id: 1, name: "Prof. Smith", lastMessage: "Check the Calculus notes here: /docs/math-lecture.pdf", time: "10:15 AM" },
-    { id: 2, name: "Jane Doe", lastMessage: "Can you send the notes?", time: "Yesterday" },
-    { id: 3, name: "CS Club", lastMessage: "Event this Friday!", time: "Monday" },
-  ];
+  // Fetch user from local storage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
-  const chatMembers: { [chatId: number]: number[] } = {
-    0: [1, 2, 3, 4], // Study Group: You, Mike, Jane, Prof. Smith
-    1: [1, 4], // Prof. Smith: You, Prof. Smith
-    2: [1, 3], // Jane Doe: You, Jane
-    3: [1, 2, 3], // CS Club: You, Mike, Jane
-  };
+  // Fetch rooms from the server
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const res = await fetch("/api/room/viewRoom"); // Assuming your API route is at /api/room
+        if (!res.ok) throw new Error("Failed to fetch rooms");
+
+        const data = await res.json();
+        setRooms(data);
+      } catch (err: any) {
+        console.error(err.message);
+      }
+    };
+
+    fetchRooms();
+  }, []);
+
+  // fetch messages
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    const messagesRef = ref(realtimeDB, `chats/${selectedChat.id}`);
+
+    // Listen for realtime updates
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+
+      if (!data) {
+        setMessages([]);
+        return;
+      }
+      // Map Firebase object to array of messages
+      const loadedMessages: Message[] = Object.entries(data).map(([key, value]: [string, any]) => ({
+        id: value.id,
+        senderId: value.senderId,
+        senderName: value.senderName,
+        message: value.message,
+        roomId: value.roomId,
+        type: value.type,
+        reactions: value.reaction,
+        timestamp: value.timestamp,
+        createdAt: value.createdAt,
+        updatedAt: value.updatedAt,
+        readBy: value.readBy,
+        isSent: value.senderId === user?.uid,
+        pollOptions: value.pollOptions ? value.pollOptions.map((opt: any) => ({
+          id: opt.id,
+          text: opt.text,
+          votes: opt.votes || [],
+        })) : undefined,
+        allowsMultipleVotes: value.allowsMultipleVotes || false,
+      }));
+
+      setMessages(loadedMessages);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [selectedChat]);
 
   const currentUserId = 1;
-
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      chatId: 0,
-      type: "message",
-      sender: "You",
-      senderId: 1,
-      text: "Hey everyone, ready for the quiz?",
-      time: "2025-04-22T12:25:00Z",
-      isSent: true,
-      readBy: [1],
-      reactions: {},
-    },
-    {
-      id: 2,
-      chatId: 0,
-      type: "message",
-      sender: "Mike",
-      senderId: 2,
-      text: "Yeah, just reviewing now!",
-      time: "2025-04-22T12:26:00Z",
-      isSent: false,
-      readBy: [2],
-      reactions: { 1: "👍" },
-    },
-    {
-      id: 3,
-      chatId: 0,
-      type: "message",
-      sender: "You",
-      senderId: 1,
-      text: "Cool, see you at 2!",
-      time: "2025-04-22T12:30:00Z",
-      isSent: true,
-      readBy: [1],
-      reactions: {},
-    },
-    {
-      id: 4,
-      chatId: 0,
-      type: "poll",
-      sender: "You",
-      senderId: 1,
-      time: "2025-04-22T12:35:00Z",
-      isSent: true,
-      readBy: [1],
-      reactions: {},
-      poll: {
-        id: 1,
-        question: "What time for the study session?",
-        options: [
-          { text: "2 PM", votes: 2 },
-          { text: "4 PM", votes: 1 },
-        ],
-        allowMultiple: false,
-        votes: [
-          { userId: 1, optionIdx: 0 },
-          { userId: 2, optionIdx: 0 },
-          { userId: 3, optionIdx: 1 },
-        ],
-      },
-    },
-    {
-      id: 5,
-      chatId: 1,
-      type: "message",
-      sender: "Prof. Smith",
-      senderId: 4,
-      text: "Check the Calculus notes here: /docs/math-lecture.pdf",
-      time: "2025-04-22T10:15:00Z",
-      isSent: false,
-      readBy: [4],
-      reactions: {},
-    },
-  ]);
-
-  // Simulate read receipts
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((m) => ({
-          ...m,
-          readBy: m.readBy.includes(currentUserId)
-            ? m.readBy
-            : [...m.readBy, ...(chatMembers[m.chatId] || [])].filter(
-                (id, idx, arr) => arr.indexOf(id) === idx
-              ),
-        }))
-      );
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [messages, currentUserId]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -178,86 +149,153 @@ export default function ChatPage() {
     return format(date, "MMM d, yyyy HH:mm");
   };
 
-  const handleSend = () => {
-    if (message.trim()) {
-      const newMessage: Message = {
-        id: messages.length + 1,
-        chatId: selectedChat!,
-        type: "message",
-        sender: "You",
-        senderId: currentUserId,
-        text: message,
-        time: new Date().toISOString(),
-        isSent: true,
-        readBy: [currentUserId],
-        reactions: {},
-      };
-      setMessages([...messages, newMessage]);
-      setMessage("");
+  const handleSend = async () => {
+    if (!message.trim() && !user) return;
+
+    try {
+      const res = await fetch("/api/chat/createChat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+
+        },
+        body: JSON.stringify({
+          senderId: user?.uid,
+          senderName: user?.name,
+          message: message,
+          reaction: {
+            "👍": 0,
+            "❤️": 0,
+            "😂": 0,
+          },
+          readBy: [user?.uid],
+          roomId: selectedChat?.id,
+          type: "message",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return;
+      }
+
+      setMessage("")
+    } catch (err) {
+      console.error("Error sending message:", err);
     }
   };
 
-  const handleCreatePoll = () => {
+
+  const handleCreatePoll = async () => {
+    if (!selectedChat || !user) {
+      setPollError("You must select a chat and be logged in to create a poll.");
+      return;
+    }
+
     if (!pollQuestion.trim()) {
       setPollError("Poll question is required.");
       return;
     }
+
     if (pollOptions.length < 2 || pollOptions.some((opt) => !opt.trim())) {
       setPollError("At least two non-empty options are required.");
       return;
     }
-    const newPoll: Message = {
-      id: messages.length + 1,
-      chatId: selectedChat!,
+
+    const pollOptionObjects = pollOptions.map((opt, index) => ({
+      id: `opt${index + 1}`,
+      text: opt.trim(),
+      votes: [],
+    }));
+
+    const pollPayload = {
+      senderId: user.uid,
+      senderName: user.name,
+      message: pollQuestion.trim(),
+      roomId: selectedChat.id,
       type: "poll",
-      sender: "You",
-      senderId: currentUserId,
-      time: new Date().toISOString(),
-      isSent: true,
-      readBy: [currentUserId],
-      reactions: {},
-      poll: {
-        id: messages.filter((m) => m.type === "poll").length + 1,
-        question: pollQuestion,
-        options: pollOptions.map((opt) => ({ text: opt, votes: 0 })),
-        allowMultiple,
-        votes: [],
-      },
+      readBy: [user.uid],
+      reaction: {},
+      timestamp: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      pollOptions: pollOptionObjects,
+      allowsMultipleVotes: allowMultiple,
     };
-    setMessages([...messages, newPoll]);
-    setPollQuestion("");
-    setPollOptions(["", ""]);
-    setAllowMultiple(false);
-    setShowPollDialog(false);
-    setPollError("");
+
+    try {
+      const res = await fetch("/api/chat/createChat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(pollPayload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create poll");
+      }
+
+      setPollQuestion("");
+      setPollOptions(["", ""]);
+      setAllowMultiple(false);
+      setShowPollDialog(false);
+      setPollError("");
+    } catch (err: any) {
+      console.error("Poll creation failed:", err.message);
+      setPollError("Failed to create poll. Please try again.");
+    }
   };
 
-  const handleVote = (pollId: number, optionIdx: number) => {
-    setMessages((prev) =>
-      prev.map((msg) => {
-        if (msg.type !== "poll" || msg.poll?.id !== pollId) return msg;
-        const poll = JSON.parse(JSON.stringify(msg.poll!)); // Deep clone
-        const existingVote = poll.votes.find((v: any) => v.userId === currentUserId);
-        if (!poll.allowMultiple && existingVote) {
-          poll.votes = poll.votes.filter((v: any) => v.userId !== currentUserId);
-          poll.options[existingVote.optionIdx].votes -= 1;
-        }
-        poll.votes.push({ userId: currentUserId, optionIdx });
-        poll.options[optionIdx].votes += 1;
-        return { ...msg, poll };
-      })
-    );
+  const handleVote = async (chatId: string, optionIdx: number) => {
+    if (!user || !selectedChat?.id) return;
+
+    try {
+      const res = await fetch("/api/chat/updateChat/pollVotes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chatId,
+          roomId: selectedChat.id,
+          optionIdx,
+          userId: user.uid,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("Vote failed:", data.error);
+      } 
+    } catch (err) {
+      console.error("Vote error:", err);
+    }
   };
 
-  const handleReactMessage = (messageId: number, emoji: string) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId
-          ? { ...m, reactions: { ...m.reactions, [currentUserId]: emoji } }
-          : m
-      )
-    );
-  };
+
+  async function handleReactMessage(chatId: string, emoji: string) {
+
+    if (!selectedChat && !user) return;
+
+    const userId = user?.uid;
+    const roomId = selectedChat?.id;
+
+    const res = await fetch('/api/chat/updateChat/reaction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId, chatId, emoji, userId }),
+    });
+
+    const data = await res.json();
+    if (data.error) {
+      console.error('Failed to update reaction:', data.error);
+    } 
+  }
 
   const renderMessageContent = (text: string) => {
     const docLinkRegex = /\/docs\/[a-zA-Z0-9-]+\.pdf/;
@@ -291,30 +329,30 @@ export default function ChatPage() {
           </div>
         </CardHeader>
         <ScrollArea className="flex-1">
-          {chats.map((chat) => (
+          {rooms?.map((room) => (
             <div
-              key={chat.id}
+              key={room.id}
               role="button"
-              aria-label={`Select ${chat.name}`}
-              onClick={() => setSelectedChat(chat.id)}
+              aria-label={`Select ${room.name}`}
+              onClick={() => setSelectedChat(room)}
               className={cn(
                 "flex items-center gap-3 p-4 border-b border-border/50 cursor-pointer transition-all duration-300",
-                selectedChat === chat.id
+                selectedChat?.id === room.id
                   ? "bg-primary/20 border-l-4 border-primary rounded-l-lg"
                   : "hover:bg-primary/10"
               )}
             >
               <Avatar className="w-10 h-10">
-                <AvatarImage src={`/chat-${chat.id}.jpg`} alt={chat.name} />
+                <AvatarImage src={`/chat-${room.id}.jpg`} alt={room.name} />
                 <AvatarFallback className="bg-primary/20 text-primary">
-                  {chat.name.charAt(0)}
+                  {room.name.charAt(0)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-foreground font-medium truncate">{chat.name}</p>
-                <p className="text-xs text-muted-foreground truncate">{chat.lastMessage}</p>
+                <p className="text-foreground font-medium truncate">{room.name}</p>
+                <p className="text-xs text-muted-foreground truncate">temp</p>
               </div>
-              <p className="text-xs text-muted-foreground flex-shrink-0">{chat.time}</p>
+              <p className="text-xs text-muted-foreground flex-shrink-0">tempTime</p>
             </div>
           ))}
         </ScrollArea>
@@ -326,13 +364,13 @@ export default function ChatPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Avatar className="w-10 h-10">
-                  <AvatarImage src={`/chat-${selectedChat}.jpg`} alt={chats[selectedChat].name} />
+                  <AvatarImage src={`/chat-${selectedChat}.jpg`} alt={selectedChat?.name} />
                   <AvatarFallback className="bg-primary/20 text-primary">
-                    {chats[selectedChat].name.charAt(0)}
+                    {selectedChat?.name.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
                 <CardTitle className="text-xl font-semibold text-foreground">
-                  {chats[selectedChat].name}
+                  {selectedChat?.name}
                 </CardTitle>
               </div>
               <Button
@@ -346,7 +384,7 @@ export default function ChatPage() {
           <ScrollArea className="flex-1 p-6 h-full min-h-0" ref={scrollRef}>
             <div className="space-y-4">
               {messages
-                .filter((msg) => msg.chatId === selectedChat)
+                .filter((msg) => msg.roomId === selectedChat.id)
                 .map((msg) => (
                   <div
                     key={msg.id}
@@ -357,9 +395,9 @@ export default function ChatPage() {
                   >
                     {!msg.isSent && (
                       <Avatar className="w-8 h-8 flex-shrink-0">
-                        <AvatarImage src={`/user-${msg.sender}.jpg`} alt={msg.sender} />
+                        <AvatarImage src={`/user-${msg.senderId}.jpg`} alt={msg.senderName} />
                         <AvatarFallback className="bg-primary/20 text-primary">
-                          {msg.sender.charAt(0)}
+                          {msg.senderName.charAt(0)}
                         </AvatarFallback>
                       </Avatar>
                     )}
@@ -372,26 +410,30 @@ export default function ChatPage() {
                             : "bg-muted/70 text-foreground rounded-tl-none"
                         )}
                       >
-                        <p className="text-xs font-medium">{msg.sender}</p>
-                        <p className="text-sm mt-1">{renderMessageContent(msg.text || "")}</p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <p className="text-xs text-muted-foreground">{formatTimestamp(msg.time)}</p>
+                        <p className="text-xs font-medium">{msg.senderName}</p>
+                        <p className="text-sm mt-1">{renderMessageContent(msg.message || "")}</p>
+                        <div className="flex items-center gap-1 mt-1 justify-end">
+                          <p className="text-xs text-muted-foreground">{formatTimestamp(msg.updatedAt)}</p>
                           {msg.isSent && (
                             <CheckCheck
                               className={cn(
                                 "h-4 w-4",
-                                msg.readBy.length === chatMembers[msg.chatId].length
+                                msg.readBy?.length === selectedChat.members.length
                                   ? "text-primary"
                                   : "text-muted-foreground"
                               )}
                             />
                           )}
                         </div>
-                        {Object.keys(msg.reactions).length > 0 && (
-                          <div className="flex gap-1 mt-1">
-                            {Object.entries(msg.reactions).map(([userId, emoji]) => (
-                              <span key={userId} className="text-xs">{emoji}</span>
-                            ))}
+                        {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                          <div className="flex gap-2 mt-1">
+                            {Object.entries(msg.reactions)
+                              .filter(([_, userIds]) => Array.isArray(userIds) && userIds.length > 0)
+                              .map(([emoji, userIds]) => (
+                                <span key={emoji} className="text-xs">
+                                  {emoji} {userIds.length}
+                                </span>
+                              ))}
                           </div>
                         )}
                         <Select
@@ -416,27 +458,26 @@ export default function ChatPage() {
                             : "bg-muted/70 text-foreground rounded-tl-none"
                         )}
                       >
-                        <p className="text-xs font-medium">{msg.sender}</p>
-                        <p className="text-sm font-semibold mt-1">{msg.poll?.question}</p>
+                        <p className="text-xs font-medium">{msg.senderName}</p>
+                        <p className="text-sm font-semibold mt-1">{msg.message}</p>
                         <div className="mt-3 space-y-2">
-                          {msg.poll?.options.map((opt, idx) => {
-                            const totalVotes = msg.poll?.options.reduce((sum, o) => sum + o.votes, 0) || 0;
-                            const percentage = totalVotes ? (opt.votes / totalVotes) * 100 : 0;
-                            const userVoted = msg.poll?.votes.some(
-                              (v) => v.userId === currentUserId && v.optionIdx === idx
-                            );
+                          {msg.pollOptions?.map((opt, idx) => {
+                            const totalVotes = msg.pollOptions?.reduce((sum, o) => sum + o.votes.length, 0) || 0;
+                            const percentage = totalVotes ? (opt.votes.length / totalVotes) * 100 : 0;
+                            const userVoted = user?.uid ? opt.votes.includes(user.uid) : false;
+
                             return (
                               <div
                                 key={idx}
                                 className="flex items-center gap-2 p-2 bg-muted/50 rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-200"
-                                onClick={() => handleVote(msg.poll!.id, idx)}
+                                onClick={() => handleVote(msg.id, idx)}
                               >
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-sm text-foreground">
-                                      {idx + 1}. {opt.text}
-                                    </span>
                                     {userVoted && <Check className="h-4 w-4 text-primary" />}
+                                    <span className="text-sm text-foreground">
+                                      {opt.text}
+                                    </span>
                                   </div>
                                   <div className="w-full bg-muted/30 h-1.5 rounded-full mt-1">
                                     <div
@@ -448,29 +489,34 @@ export default function ChatPage() {
                                     />
                                   </div>
                                 </div>
-                                <span className="text-xs text-muted-foreground">{opt.votes} votes</span>
+                                <span className="text-xs text-muted-foreground">{opt.votes.length} votes</span>
                               </div>
                             );
                           })}
+
                         </div>
-                        <div className="flex items-center gap-1 mt-2">
-                          <p className="text-xs text-muted-foreground">{formatTimestamp(msg.time)}</p>
+                        <div className="flex items-center gap-1 mt-2 justify-end">
+                          <p className="text-xs text-muted-foreground">{formatTimestamp(msg.updatedAt)}</p>
                           {msg.isSent && (
                             <CheckCheck
                               className={cn(
                                 "h-4 w-4",
-                                msg.readBy.length === chatMembers[msg.chatId].length
+                                msg.readBy?.length === selectedChat.members.length
                                   ? "text-primary"
                                   : "text-muted-foreground"
                               )}
                             />
                           )}
                         </div>
-                        {Object.keys(msg.reactions).length > 0 && (
-                          <div className="flex gap-1 mt-1">
-                            {Object.entries(msg.reactions).map(([userId, emoji]) => (
-                              <span key={userId} className="text-xs">{emoji}</span>
-                            ))}
+                        {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                          <div className="flex gap-2 mt-1">
+                            {Object.entries(msg.reactions)
+                              .filter(([_, userIds]) => Array.isArray(userIds) && userIds.length > 0)
+                              .map(([emoji, userIds]) => (
+                                <span key={emoji} className="text-xs">
+                                  {emoji} {userIds.length}
+                                </span>
+                              ))}
                           </div>
                         )}
                         <Select
@@ -490,7 +536,7 @@ export default function ChatPage() {
                     {msg.isSent && (
                       <Avatar className="w-8 h-8 flex-shrink-0">
                         <AvatarImage src="/user-you.jpg" alt="You" />
-                        <AvatarFallback className="bg-primary/20 text-primary">Y</AvatarFallback>
+                        <AvatarFallback className="bg-primary/20 text-primary">{msg.senderName.charAt(0)}</AvatarFallback>
                       </Avatar>
                     )}
                   </div>

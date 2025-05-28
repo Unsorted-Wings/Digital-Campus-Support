@@ -13,51 +13,71 @@ if (!admin.apps.length) {
 }
 
 export async function GET(req: NextRequest) {
-    try {
-        // Authorization using NextAuth JWT Token
-        const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  try {
+    // Authorization using NextAuth JWT Token
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-        if (!token) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
-        // Fetch assignments from Firestore
-        const snapshot = await admin.firestore().collection("assignments").get();
-        const assignments = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            assignmentDocUrl: doc.data().assignmentDocUrl,
-            batchId: doc.data().batchId,
-            courseId: doc.data().courseId,
-            createdAt: doc.data().createdAt,
-            description: doc.data().description,
-            dueDate: doc.data().dueDate,
-            semesterId: doc.data().semesterId,
-            subjectId: doc.data().subjectId, // Corrected to subjectId
-            submittedBy: doc.data().submittedBy,
-            teacherId: doc.data().teacherId,
-            title: doc.data().title,
-            updatedAt: doc.data().updatedAt,
-        }));
-
-        // Fetch subjects
-        const subjectsSnapshot = await admin.firestore().collection("subjects").get();
-        const subjects: Record<string, any> = {};
-        subjectsSnapshot.docs.forEach((doc) => {
-            subjects[doc.id] = doc.data();
-        });
-
-        // Combine assignment data with subject details
-        const assignmentsWithSubjects = assignments.map((assignment) => {
-            const subjectId = assignment.subjectId; // Use subjectId from the assignment
-            const subjectDetails = subjects[subjectId] || { name: "Unknown Subject" };
-            return {
-                ...assignment,
-                subject: subjectDetails.name, // Changed to only include subject name.  You can add other subject fields as needed.
-            };
-        });
-
-        return NextResponse.json(assignmentsWithSubjects, { status: 200 });
-    } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { searchParams } = new URL(req.url);
+    const courseId = searchParams.get("courseId");
+    console.log(token)
+    if (!courseId) {
+      return NextResponse.json({ error: "Missing courseId" }, { status: 400 });
+    }
+
+    // Fetch assignments from Firestore by courseId
+    const snapshot = await admin
+      .firestore()
+      .collection("assignments")
+      .where("courseId", "==", courseId)
+      .get();
+
+    const assignments = snapshot.docs.map((doc) => {
+      const data = doc.data();
+
+      // Filter submittedBy array to only include entry with matching uid
+      const submittedBy = (data.submittedBy || []).filter(
+        (entry: any) => entry.userId === token.id
+      );
+
+      return {
+        id: doc.id,
+        assignmentDocUrl: data.assignmentDocUrl,
+        batchId: data.batchId,
+        courseId: data.courseId,
+        createdAt: data.createdAt,
+        description: data.description,
+        dueDate: data.dueDate,
+        semesterId: data.semesterId,
+        subjectId: data.subjectId,
+        submittedBy, // filtered array
+        teacherId: data.teacherId,
+        title: data.title,
+        updatedAt: data.updatedAt,
+      };
+    });
+
+    // Fetch all subjects
+    const subjectsSnapshot = await admin.firestore().collection("subjects").get();
+    const subjects: Record<string, any> = {};
+    subjectsSnapshot.docs.forEach((doc) => {
+      subjects[doc.id] = doc.data();
+    });
+
+    // Combine assignment with subject name
+    const assignmentsWithSubjects = assignments.map((assignment) => {
+      const subjectDetails = subjects[assignment.subjectId] || { name: "Unknown Subject" };
+      return {
+        ...assignment,
+        subject: subjectDetails.name,
+      };
+    });
+
+    return NextResponse.json(assignmentsWithSubjects, { status: 200 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }
