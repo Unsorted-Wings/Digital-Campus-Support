@@ -327,9 +327,6 @@ export default function SchedulePage() {
       isSameDay(startOfDay(event.start), startOfDay(currentDate))
     );
 
-    console.log(expandedEvents);
-    console.log("Day Events:", dayEvents);
-
     return (
       <ScrollArea className="h-full min-h-0">
         <div className="grid grid-cols-[80px_1fr] border-b border-border/50 bg-muted/50 p-2">

@@ -60,6 +60,14 @@ const [allSubjects, setSubjects] =useState<Subject[]>([]);
   // const [uid, setUid] = useState<string | null>(null);
   // const [courseId, setCourseId] = useState<string | null>(null);
  
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
   const fetchAssignments = async () => {
      const storedUser = localStorage.getItem("user");
@@ -74,13 +82,15 @@ const [allSubjects, setSubjects] =useState<Subject[]>([]);
       console.log("course id : ", courseId);
       if (!courseId || !uid) throw new Error("Course ID not found in local storage");
 
-      const response = await fetch(`/api/assignment/viewAssignment?courseId=${courseId}`);
+    const response = await fetch(`/api/assignment/viewAssignment?courseId=${courseId}`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch assignments: ${response.status}`);
       }
+     
 
-      const data = await response.json();
+    const data = await response.json();
+    const uid = user.uid; // assuming `user.id` is the Firebase Auth UID
 
       // Enhance assignment data with status
       const enhancedAssignments = data.map((assignment: any) => {
@@ -187,7 +197,7 @@ console.log(data)
   };
 
   const handleSubmit = async (assignmentId: number) => {
-    console.log(assignmentId)
+    console.log(assignmentId);
     if (!selectedFile) {
       setUploadError("Please select a file to upload.");
       return;
@@ -219,35 +229,34 @@ console.log(data)
         const uid = parsedUser?.uid || "unknown";
 
         try {
-          const createAssignmentResponse = await fetch("/api/assignment/createAssignment", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              assignmentId: assignmentId,
-              userId: uid,
-              assignmentDocUrl: data.data.secure_url,
-              uploadedAt: new Date().toISOString()
-            }),
-          });
+          const createAssignmentResponse = await fetch(
+            "/api/assignment/createAssignment",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                assignmentId: assignmentId,
+                userId: uid,
+                assignmentDocUrl: data.data.secure_url,
+                uploadedAt: new Date().toISOString(),
+              }),
+            }
+          );
 
           if (createAssignmentResponse.ok) {
-            console.log("assignment uploaded.")
+            console.log("assignment uploaded.");
             setUploading(false);
             setSelectedFile(null);
             setSelectedAssignment(null);
             setUploadSuccess(true);
-
           } else {
-            console.log("error fetching data")
+            console.log("error fetching data");
           }
-
-
         } catch (error: any) {
-          console.log(error)
+          console.log(error);
         }
-
 
         fetchAssignments(); // Re-fetch assignments to update status
       } else {
