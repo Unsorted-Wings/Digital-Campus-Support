@@ -8,19 +8,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Plus, X, Trash2, Edit, File, ChevronUp, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { doc } from "firebase/firestore";
 
 interface Assignment {
-  id: number;
+  id: string;
   title: string;
-  course: string;
+  course: string; // Changed to array of course IDs
   dueDate: string;
-  document?: File | null;
+  assignmentDocUrl?: string | null;
+  subjectId: string;
+  subjectName: string; // Added subjectName to interface
   submissions: number;
   totalStudents: number;
+  submittedBy?: Submission[];
+  batchId?: string;
+  createdat?: string;
+  description?: string;
+  semesterId?: string;
+  // If your backend sends a 'subject' object, you might need this:
+  // subject?: { subjectName: string; subjectId: string };
+  teacherId?: string;
+  updatedAt?: string;
 }
 
 interface Student {
@@ -32,98 +44,101 @@ interface Student {
   assignments?: number;
 }
 
-interface Subject {
+// interface Subject {
+//   name: string;
+//   students: Student[];
+// }
+
+interface Subjects {
+  id: string;
   name: string;
-  students: Student[];
 }
 
 interface Course {
+  id: string;
   name: string;
-  subjects: Subject[];
+  subjects: Subjects[];
 }
-
 interface Submission {
-  studentId: number;
-  studentName: string;
-  submittedAt: string;
-  file: string;
+  userId: number;
+  userName: string;
+  uploadedAt: string;
+  assignmentDocUrl: string;
   grade?: number;
 }
 
 export default function FacultyAssignmentsPage() {
-  const [assignments, setAssignments] = useState<Assignment[]>([
-    { id: 1, title: "Math Problem Set", course: "Mathematics 101", dueDate: "2025-04-10", document: null, submissions: 25, totalStudents: 30 },
-    { id: 2, title: "Physics Lab Report", course: "Physics 201", dueDate: "2025-04-08", document: null, submissions: 20, totalStudents: 25 },
-    { id: 3, title: "CS Project", course: "CS 301", dueDate: "2025-04-15", document: null, submissions: 30, totalStudents: 35 },
-  ]);
-   const [courses, setCourses] = useState<Course[]>([
-      {
-        name: "Mathematics 101",
-        subjects: [
-          {
-            name: "Algebra",
-            students: [
-              { id: 1, name: "John Doe", sessional1: undefined, sessional2: undefined, attendance: undefined, assignments: undefined },
-              { id: 2, name: "Jane Smith", sessional1: 8, sessional2: 9, attendance: 4, assignments: 3 },
-            ],
-          },
-          {
-            name: "Calculus",
-            students: [
-              { id: 1, name: "John Doe", sessional1: 7, sessional2: 8, attendance: 5, assignments: 4 },
-              { id: 2, name: "Jane Smith", sessional1: 9, sessional2: 7, attendance: 3, assignments: 5 },
-            ],
-          },
-        ],
-      },
-      {
-        name: "Physics 201",
-        subjects: [
-          {
-            name: "Mechanics",
-            students: [
-              { id: 3, name: "Alice Brown", sessional1: 7, sessional2: 6, attendance: 5, assignments: 4 },
-            ],
-          },
-          {
-            name: "Thermodynamics",
-            students: [
-              { id: 3, name: "Alice Brown", sessional1: 8, sessional2: 8, attendance: 4, assignments: 3 },
-            ],
-          },
-        ],
-      },
-      {
-        name: "CS 301",
-        subjects: [
-          {
-            name: "Algorithms",
-            students: [
-              { id: 4, name: "Bob Johnson", sessional1: 9, sessional2: 8, attendance: 3, assignments: 5 },
-            ],
-          },
-          {
-            name: "Data Structures",
-            students: [
-              { id: 4, name: "Bob Johnson", sessional1: 6, sessional2: 7, attendance: 4, assignments: 4 },
-            ],
-          },
-        ],
-      },
-    ]);
-  
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  // const [courses, setCourses] = useState<Course[]>([
+  //   {
+  //     name: "Mathematics 101",
+  //     subjects: [
+  //       {
+  //         name: "Algebra",
+  //         students: [
+  //           { id: 1, name: "John Doe", sessional1: undefined, sessional2: undefined, attendance: undefined, assignments: undefined },
+  //           { id: 2, name: "Jane Smith", sessional1: 8, sessional2: 9, attendance: 4, assignments: 3 },
+  //         ],
+  //       },
+  //       {
+  //         name: "Calculus",
+  //         students: [
+  //           { id: 1, name: "John Doe", sessional1: 7, sessional2: 8, attendance: 5, assignments: 4 },
+  //           { id: 2, name: "Jane Smith", sessional1: 9, sessional2: 7, attendance: 3, assignments: 5 },
+  //         ],
+  //       },
+  //     ],
+  //   },
+  //   {
+  //     name: "Physics 201",
+  //     subjects: [
+  //       {
+  //         name: "Mechanics",
+  //         students: [
+  //           { id: 3, name: "Alice Brown", sessional1: 7, sessional2: 6, attendance: 5, assignments: 4 },
+  //         ],
+  //       },
+  //       {
+  //         name: "Thermodynamics",
+  //         students: [
+  //           { id: 3, name: "Alice Brown", sessional1: 8, sessional2: 8, attendance: 4, assignments: 3 },
+  //         ],
+  //       },
+  //     ],
+  //   },
+  //   {
+  //     name: "CS 301",
+  //     subjects: [
+  //       {
+  //         name: "Algorithms",
+  //         students: [
+  //           { id: 4, name: "Bob Johnson", sessional1: 9, sessional2: 8, attendance: 3, assignments: 5 },
+  //         ],
+  //       },
+  //       {
+  //         name: "Data Structures",
+  //         students: [
+  //           { id: 4, name: "Bob Johnson", sessional1: 6, sessional2: 7, attendance: 4, assignments: 4 },
+  //         ],
+  //       },
+  //     ],
+  //   },
+  // ]);
 
-  const [submissions, setSubmissions] = useState<{ [key: number]: Submission[] }>({
-    1: [
-      { studentId: 1, studentName: "John Doe", submittedAt: "2025-04-09", file: "/docs/math-set-john.pdf", grade: undefined },
-      { studentId: 2, studentName: "Jane Smith", submittedAt: "2025-04-08", file: "/docs/math-set-jane.pdf", grade: 85 },
+  const [courses, setCourses] = useState<Course[]>([]);
+
+  const [submissions, setSubmissions] = useState<{ [key: string]: Submission[] }>({
+    "1": [
+      { userId: 1, userName: "John Doe", uploadedAt: "2025-04-09", assignmentDocUrl: "/docs/math-set-john.pdf", grade: undefined },
+      { userId: 2, userName: "Jane Smith", uploadedAt: "2025-04-08", assignmentDocUrl: "/docs/math-set-jane.pdf", grade: 85 },
     ],
-    2: [
-      { studentId: 3, studentName: "Alice Brown", submittedAt: "2025-04-07", file: "/docs/physics-lab-alice.pdf", grade: 90 },
+    "2": [
+      { userId: 3, userName: "Alice Brown", uploadedAt: "2025-04-07", assignmentDocUrl: "/docs/physics-lab-alice.pdf", grade: 90 },
     ],
   });
 
-  const [selectedAssignment, setSelectedAssignment] = useState<number | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+
   const [openCourse, setOpenCourse] = useState<string>(""); // Added state for openCourse
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -131,58 +146,201 @@ export default function FacultyAssignmentsPage() {
   const [editAssignment, setEditAssignment] = useState<Assignment | null>(null);
   const [newAssignment, setNewAssignment] = useState({ title: "", course: "", dueDate: "", document: null as File | null });
 
+  const [uid, setUid] = useState<string | null>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+    const uidFromStorage = parsedUser?.uid || null;
+    setUid(uidFromStorage);
+  }, []);
+  const fetchAssignments = async () => {
+    try {
+
+      const response = await fetch(`/api/assignment/viewAssignment`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch assignments: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Enhance assignment data with status
+
+      const enhancedAssignments = data.map((assignment: Assignment) => ({
+        ...assignment,
+        totalStudents: 120,
+        submissions: assignment.submittedBy?.length || 0,
+      }));
+
+      setAssignments(enhancedAssignments);
+      console.log(enhancedAssignments);
+    } catch (error: any) {
+      console.error("Error fetching assignments:", error);
+    }
+  };
+
+  const fetchCourseWiseSubjects = async () => {
+    try {
+
+      const response = await fetch(`/api/subjects/viewSubject/viewCourseWiseSubjects?teacherId=CsZ00htYppoqATY6uxAQ`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch assignments: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(data)
+      // Map data to Course[] structure
+      const courseMap: Record<string, Course> = {};
+
+      data.forEach((item: any) => {
+        if (!courseMap[item.courseId]) {
+          courseMap[item.courseId] = {
+            id: item.courseId,
+            name: item.courseName,
+            subjects: [],
+          };
+        }
+
+        // Avoid duplicate subjects
+        const subjectExists = courseMap[item.courseId].subjects.some(
+          (s) => s.id === item.subjectId
+        );
+
+        if (!subjectExists) {
+          courseMap[item.courseId].subjects.push({
+            id: item.subjectId,
+            name: item.subjectName,
+          });
+        }
+      });
+
+      const courseList = Object.values(courseMap);
+      setCourses(courseList);
+      console.log("Transformed course list:", courseList);
+    } catch (error: any) {
+      console.error("Error fetching assignments:", error);
+    }
+  };
+
+  // Fetch assignments on component mount
+  useEffect(() => {
+    fetchAssignments();
+  }, []);
+  useEffect(() => {
+    fetchCourseWiseSubjects();
+  }, []);
+
   const filteredAssignments = selectedCourse
     ? assignments.filter((a) => a.course === selectedCourse)
     : assignments;
 
-  const handleAddOrUpdateAssignment = () => {
+  // useEffect(() => {
+  //   fetchCourses();
+  // }, []);
+
+  const handleAddOrUpdateAssignment = async () => {
     if (newAssignment.title && newAssignment.course && newAssignment.dueDate) {
       if (editAssignment) {
+        // Updating an existing assignment (not sending to API in this example)
         setAssignments((prev) =>
           prev.map((a) =>
             a.id === editAssignment.id
-              ? { ...a, title: newAssignment.title, course: newAssignment.course, dueDate: newAssignment.dueDate, document: newAssignment.document }
+              ? {
+                ...a,
+                title: newAssignment.title,
+                course: newAssignment.course,
+                dueDate: newAssignment.dueDate,
+                document: newAssignment.document,
+              }
               : a
           )
         );
         console.log("Updated assignment:", newAssignment);
       } else {
-        const newId = assignments.length + 1;
-        setAssignments((prev) => [
-          ...prev,
-          {
-            id: newId,
-            title: newAssignment.title,
-            course: newAssignment.course,
-            dueDate: newAssignment.dueDate,
-            document: newAssignment.document,
-            submissions: 0,
-            totalStudents: newAssignment.course === "Mathematics 101" ? 30 : newAssignment.course === "Physics 201" ? 25 : 35,
-          },
-        ]);
-        console.log("Added assignment:", newAssignment);
+        try {
+          const formData = new FormData();
+          formData.append("title", newAssignment.title);
+          formData.append("course", newAssignment.course);
+          formData.append("dueDate", newAssignment.dueDate);
+          if (newAssignment.document) {
+            formData.append("file", newAssignment.document);
+          }
+
+          const response = await fetch("/api/DocRepo/uploadAssignment", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to upload assignment");
+          }
+          const cloudiData = await response.json();
+          console.log(cloudiData)
+          try {
+            const createAssignmentResponse = await fetch("/api/assignment/createAssignment", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                title: newAssignment.title,
+                description: "Sample Assignment",
+                courseId: "g8XqpmNeBFcD0ef8vn9V",
+                batchId: "batch_2025spring",
+                semesterId: "2TEj1rRwbjuluB1jGMQx",
+                subjectId: "b2YEKfSN0nvtG1DJEDuY",
+                teacherId: uid,
+                dueDate: newAssignment.dueDate,
+                assignmentDocUrl: cloudiData.data.secure_url
+              }),
+            });
+
+            if (createAssignmentResponse.ok) {
+              console.log("assignment uploaded.")
+              fetchAssignments()
+
+
+
+            } else {
+              console.log("error fetching data")
+            }
+          } catch (error: any) {
+            console.log(error)
+          }
+          const newId = assignments.length + 1;
+
+
+          console.log("Added assignment:", newAssignment);
+        } catch (error: any) {
+          console.error("Error uploading assignment:", error);
+        }
       }
+
+      // Reset form and close dialog
       setNewAssignment({ title: "", course: "", dueDate: "", document: null });
       setEditAssignment(null);
       setShowAddForm(false);
     }
   };
 
-  const handleRemoveAssignment = (id: number) => {
+
+  const handleRemoveAssignment = (id: string) => {
     setAssignments((prev) => prev.filter((a) => a.id !== id));
-    if (selectedAssignment === id) setSelectedAssignment(null);
+    if (selectedAssignment && selectedAssignment.id === id) setSelectedAssignment(null);
     console.log(`Removed assignment ID: ${id}`);
   };
 
   const handleEditAssignment = (assignment: Assignment) => {
     setEditAssignment(assignment);
-    setNewAssignment({
-      title: assignment.title,
-      course: assignment.course,
-      dueDate: assignment.dueDate,
-      document: assignment.document ?? null,
-    });
-    setShowAddForm(true);
+    // setNewAssignment({
+    //   title: assignment.title,
+    //   course: assignment.course,
+    //   dueDate: assignment.dueDate,
+    //   document: assignment.assignmentDocUrl ?? null,
+    // });
+    // setShowAddForm(true);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,25 +350,27 @@ export default function FacultyAssignmentsPage() {
     }
   };
 
-  const handleGrade = (assignmentId: number) => {
-    setSelectedAssignment(assignmentId);
+  const handleGrade = (assignment: Assignment) => {
+
+    setSelectedAssignment(assignment);
+    console.log(assignment)
+
   };
 
-  const handleViewDocument = (document: File | null) => {
-    if (document) {
-      alert(`Viewing document: ${document.name}`);
-      // Replace with Dialog or new tab
-      // Example: window.open(URL.createObjectURL(document), "_blank");
+  const handleViewDocument = (url: string | null | undefined) => {
+    if (url) {
+      const googleDocsViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+      window.open(googleDocsViewerUrl, "_blank");
     } else {
-      alert("No document attached");
+      alert("No document URL available");
     }
-  };
+  };;
 
-  const handleSubmitGrade = (assignmentId: number, studentId: number, grade: number) => {
+  const handleSubmitGrade = (assignmentId: string, studentId: number, grade: number) => {
     setSubmissions((prev) => ({
       ...prev,
       [assignmentId]: prev[assignmentId].map((sub) =>
-        sub.studentId === studentId ? { ...sub, grade } : sub
+        sub.userId === studentId ? { ...sub, grade } : sub
       ),
     }));
     console.log(`Graded ${studentId} for assignment ${assignmentId}: ${grade}`);
@@ -336,7 +496,7 @@ export default function FacultyAssignmentsPage() {
                       className={cn(
                         "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
                         selectedCourse === course.name && selectedSubject === subject.name &&
-                          "bg-primary/20 border-l-4 border-primary"
+                        "bg-primary/20 border-l-4 border-primary"
                       )}
                       onClick={() => {
                         setSelectedCourse(course.name);
@@ -383,7 +543,7 @@ export default function FacultyAssignmentsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleGrade(assignment.id)}
+                              onClick={() => handleGrade(assignment)}
                               className="border-border text-foreground hover:bg-primary/10"
                             >
                               View Submissions
@@ -391,9 +551,9 @@ export default function FacultyAssignmentsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleViewDocument(assignment.document ?? null)}
+                              onClick={() => handleViewDocument(assignment.assignmentDocUrl ?? null)}
                               className="border-border text-foreground hover:bg-primary/10"
-                              disabled={!assignment.document}
+                              disabled={!assignment.assignmentDocUrl}
                             >
                               <File className="h-4 w-4 mr-2" />
                               View Assignment
@@ -427,7 +587,7 @@ export default function FacultyAssignmentsPage() {
               <div className="h-full flex flex-col">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-foreground">
-                    Submissions for {assignments.find((a) => a.id === selectedAssignment)?.title}
+                    Submissions for {selectedAssignment.title}
                   </h3>
                   <Button
                     variant="ghost"
@@ -449,14 +609,19 @@ export default function FacultyAssignmentsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {submissions[selectedAssignment]?.map((submission) => (
+                      {selectedAssignment?.submittedBy?.map((submission: any, index: number) => (
                         <TableRow
-                          key={submission.studentId}
+                          key={submission.userId || index}
                           className="hover:bg-primary/5 transition-all duration-300"
                         >
-                          <TableCell className="font-medium text-foreground">{submission.studentName}</TableCell>
-                          <TableCell className="text-muted-foreground">{submission.submittedAt}</TableCell>
-                          <TableCell className="text-muted-foreground">{submission.file}</TableCell>
+                          <TableCell className="font-medium text-foreground">{submission.userName}</TableCell>
+                          <TableCell className="text-muted-foreground">{submission.uploadedAt}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            <a href={`https://docs.google.com/viewer?url=${encodeURIComponent(submission.assignmentDocUrl)}`}
+                              target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                              View File
+                            </a>
+                          </TableCell>
                           <TableCell className="text-muted-foreground">
                             {submission.grade !== undefined ? `${submission.grade}/100` : "Not Graded"}
                           </TableCell>
@@ -468,14 +633,15 @@ export default function FacultyAssignmentsPage() {
                               onChange={(e) => {
                                 const grade = parseInt(e.target.value);
                                 if (grade >= 0 && grade <= 100) {
-                                  handleSubmitGrade(selectedAssignment, submission.studentId, grade);
+                                  handleSubmitGrade(selectedAssignment.id, submission.userId, grade);
                                 }
                               }}
                             />
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => console.log(`Download ${submission.file}`)}
+                              onClick={() => window.open(submission.assignmentDocUrl, "_blank")}
+                              disabled={!submission.assignmentDocUrl}
                               className="border-border text-foreground hover:bg-primary/10"
                             >
                               Download
@@ -484,10 +650,12 @@ export default function FacultyAssignmentsPage() {
                         </TableRow>
                       ))}
                     </TableBody>
+
                   </Table>
                 </ScrollArea>
               </div>
             )}
+
           </CardContent>
         </Card>
       </div>

@@ -37,7 +37,10 @@ interface Assignment {
   dueDate: string;
   status: string;
 }
-
+type Subject = {
+  id: string;
+  name: string;
+};
 export default function AssignmentSubmissionPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<number | null>(
@@ -52,58 +55,112 @@ export default function AssignmentSubmissionPage() {
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [sortField, setSortField] = useState<string>("dueDate");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+const [allSubjects, setSubjects] =useState<Subject[]>([]);
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const courseId = user.courseId;
+  // const [uid, setUid] = useState<string | null>(null);
+  // const [courseId, setCourseId] = useState<string | null>(null);
+ 
 
-const fetchAssignments = async () => {
-  setLoadingAssignments(true);
-  try {
-    console.log("course id : ", courseId);
-    if (!courseId) throw new Error("Course ID not found in local storage");
+  const fetchAssignments = async () => {
+     const storedUser = localStorage.getItem("user");
+    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+    const uid = parsedUser?.uid || null;
+    const courseId = parsedUser?.courseId || null;
 
-    const response = await fetch(`/api/assignment/viewAssignment?courseId=${courseId}`);
+    // setUid(uidFromStorage);
+    // setCourseId(courseIdFromStorage);
+    setLoadingAssignments(true);
+    try {
+      console.log("course id : ", courseId);
+      if (!courseId || !uid) throw new Error("Course ID not found in local storage");
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch assignments: ${response.status}`);
+      const response = await fetch(`/api/assignment/viewAssignment?courseId=${courseId}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch assignments: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Enhance assignment data with status
+      const enhancedAssignments = data.map((assignment: any) => {
+        const submittedByArray = assignment.submittedBy || [];
+
+        const isSubmitted = submittedByArray.some(
+          (entry: any) => entry.userId === uid
+        );
+
+        return {
+          ...assignment,
+          status: isSubmitted ? "Submitted" : "Pending",
+        };
+      });
+
+      setAssignments(enhancedAssignments);
+      console.log(enhancedAssignments);
+    } catch (error: any) {
+      console.error("Error fetching assignments:", error);
+    } finally {
+      setLoadingAssignments(false);
     }
+  };
+const fetchSubjects= async () => {
+     const storedUser = localStorage.getItem("user");
+    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+    const uid = parsedUser?.uid || null;
+    const courseId = parsedUser?.courseId || null;
 
-    const data = await response.json();
-    const uid = user.uid; // assuming `user.id` is the Firebase Auth UID
+    // setUid(uidFromStorage);
+    // setCourseId(courseIdFromStorage);
+    setLoadingAssignments(true);
+    try {
+    
 
-    // Enhance assignment data with status
-    const enhancedAssignments = data.map((assignment: any) => {
-      const submittedByArray = assignment.submittedBy || [];
+      const response = await fetch(`/api/subjects/viewSubject/viewStudentSubjects?studentId=${uid}`);
 
-      const isSubmitted = submittedByArray.some(
-        (entry: any) => entry.userId === uid
-      );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch assignments: ${response.status}`);
+      }
 
-      return {
-        ...assignment,
-        status: isSubmitted ? "Submitted" : "Pending",
-      };
-    });
+      const data = await response.json();
+console.log(data)
+ setSubjects(data.simplifiedSubjects);
+      // Enhance assignment data with status
+      // const enhancedAssignments = data.map((assignment: any) => {
+      //   const submittedByArray = assignment.submittedBy || [];
 
-    setAssignments(enhancedAssignments);
-    console.log(enhancedAssignments);
-  } catch (error: any) {
-    console.error("Error fetching assignments:", error);
-  } finally {
-    setLoadingAssignments(false);
-  }
-};
+      //   const isSubmitted = submittedByArray.some(
+      //     (entry: any) => entry.userId === uid
+      //   );
 
+      //   return {
+      //     ...assignment,
+      //     status: isSubmitted ? "Submitted" : "Pending",
+      //   };
+      // });
 
-  // Fetch assignments on component mount
+      // setAssignments(enhancedAssignments);
+      // console.log(enhancedAssignments);
+    } catch (error: any) {
+      console.error("Error fetching assignments:", error);
+    } finally {
+      setLoadingAssignments(false);
+    }
+  };
+
   useEffect(() => {
+      // if (!uid || !courseId) return;
     fetchAssignments();
   }, []);
+  useEffect(() => {
+      // if (!uid || !courseId) return;
+    fetchSubjects();
+  }, []);
 
-  const subjects = [
-    "All",
-    ...Array.from(new Set(assignments.map((a) => a.subject))),
-  ];
+  // const subjects = [
+  //   "All",
+  //   ...Array.from(new Set(assignments.map((a) => a.subject))),
+  // ];
   const statuses = ["All", "Pending", "Submitted"];
 
   const filteredAndSortedAssignments = assignments
@@ -247,17 +304,26 @@ const fetchAssignments = async () => {
                     Subject: {filterSubject}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
-                  {subjects.map((subject) => (
-                    <DropdownMenuItem
-                      key={subject}
-                      onClick={() => setFilterSubject(subject)}
-                      className="hover:bg-primary/10"
-                    >
-                      {subject}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
+               <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
+  <DropdownMenuItem
+    key="all"
+    onClick={() => setFilterSubject("All")}
+    className="hover:bg-primary/10"
+  >
+    All
+  </DropdownMenuItem>
+
+  {allSubjects.map((subject) => (
+    <DropdownMenuItem
+      key={subject.id}
+      onClick={() => setFilterSubject(subject.name)}
+      className="hover:bg-primary/10"
+    >
+      {subject.name}
+    </DropdownMenuItem>
+  ))}
+</DropdownMenuContent>
+
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
