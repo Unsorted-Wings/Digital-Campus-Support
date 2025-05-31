@@ -43,17 +43,18 @@ interface Course {
 }
 
 interface Review {
-  id: number;
-  studentId: number;
-  facultyId: number;
-  course: string;
-  subject: string;
+  id: string;
+  studentId: string;
+  facultyId: string;
+  courseId: string;
+  subjectId: string;
+  semesterId?: string;
   teachingStyle: number;
   cooperation: number;
   clarity: number;
   engagement: number;
   supportiveness: number;
-  date: string;
+  createdAt?: string;
 }
 
 export default function StudentFacultyReviewPage() {
@@ -61,6 +62,9 @@ export default function StudentFacultyReviewPage() {
   const [studentCourseData, setStudentCourseData] = useState<any>(null);
   const [selectedFaculty, setSelectedFaculty] = useState<string>("");
   const [studentSubjectData, setStudentSubjectData] = useState<any[]>([]);
+  const [currentSemesterId, setCurrentSemesterId] = useState<string | null>(
+    null
+  );
 
   const fetchStudentCourseDetails = async () => {
     try {
@@ -86,6 +90,46 @@ export default function StudentFacultyReviewPage() {
     }
   };
 
+  const fetchStudentCurrentSemester = async () => {
+    try {
+      const res = await fetch(
+        `/api/semesterDetail/viewSemesterDetail/viewStudentCurrentSemester/?courseId=${studentCourseData?.courseId}&batchId=${studentCourseData?.batchId}`,
+        {
+          method: "GET",
+        }
+      );
+
+      const data = await res.json();
+      setCurrentSemesterId(data.semesterDetailId);
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch semester detail");
+      }
+
+      return data.semesterDetailId;
+    } catch (error) {
+      console.error("Error fetching semester detail:", error);
+      return null;
+    }
+  };
+  const fetchReviews = async () => {
+    try {
+      const res = await fetch(
+        `/api/review/viewReview/viewReviewStudentSide?semesterId=${currentSemesterId}`
+      );
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch reviews");
+      }
+
+      setReviews(data.reviews);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchStudentCourseDetails();
@@ -99,11 +143,24 @@ export default function StudentFacultyReviewPage() {
   }, [studentCourseData, user]);
 
   useEffect(() => {
+    if (user && studentCourseData) {
+      fetchStudentCurrentSemester();
+    }
+  }, [user, studentCourseData]);
+
+  useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
   }, []);
+
+  useEffect(() => {
+    if (currentSemesterId) {
+      fetchReviews();
+    }
+  }, [currentSemesterId]);
+
   const facultyList: Faculty[] = Array.from(
     new Map(
       studentSubjectData.map((s) => [
@@ -112,8 +169,6 @@ export default function StudentFacultyReviewPage() {
       ])
     ).values()
   );
-
-  console.log(studentSubjectData);
 
   const filteredSubjects = studentSubjectData.filter(
     (s) => s.teacherId === selectedFaculty
@@ -146,6 +201,7 @@ export default function StudentFacultyReviewPage() {
   });
   const [error, setError] = useState<string>("");
   const [isReviewsOpen, setIsReviewsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const ratingLabels = ["Poor", "Fair", "Good", "Very Good", "Excellent"];
 
@@ -161,6 +217,44 @@ export default function StudentFacultyReviewPage() {
     setSelectedSubject("");
   };
 
+  const sendDataToServer = async (reviewData: any) => {
+    try {
+      const res = await fetch("/api/review/createReview", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(reviewData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Something went wrong");
+      }
+      setReviews((prev) => [...prev, reviewData]);
+
+      toast({
+        title: "Review Submitted",
+        description: "Your faculty review has been recorded.",
+      });
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkDuplicateReview = () => {
+    return reviews.some(
+      (review) =>
+        review.facultyId === selectedFaculty &&
+        review.courseId === selectedCourse &&
+        review.subjectId === selectedSubject &&
+        review.semesterId === currentSemesterId
+    );
+  };
+
   const handleSubmit = () => {
     if (
       !selectedFaculty ||
@@ -174,14 +268,7 @@ export default function StudentFacultyReviewPage() {
       return;
     }
 
-    const studentId = 1; // Mock; use auth context
-    const duplicate = reviews.some(
-      (r) =>
-        r.studentId === studentId &&
-        r.facultyId === parseInt(selectedFaculty) &&
-        r.course === selectedCourse &&
-        r.subject === selectedSubject
-    );
+    const duplicate = checkDuplicateReview();
     if (duplicate) {
       setError(
         "You have already submitted a review for this faculty, course, and subject."
@@ -189,21 +276,20 @@ export default function StudentFacultyReviewPage() {
       return;
     }
 
-    const newReview: Review = {
-      id: reviews.length + 1,
-      studentId,
-      facultyId: parseInt(selectedFaculty),
-      course: selectedCourse,
-      subject: selectedSubject,
+    const dataToSend = {
+      facultyId: selectedFaculty,
+      courseId: selectedCourse,
+      subjectId: selectedSubject,
+      batchId: studentCourseData?.batchId,
+      semesterId: currentSemesterId,
       teachingStyle: ratings.teachingStyle,
       cooperation: ratings.cooperation,
       clarity: ratings.clarity,
       engagement: ratings.engagement,
       supportiveness: ratings.supportiveness,
-      date: new Date().toISOString().split("T")[0],
     };
+    sendDataToServer(dataToSend);
 
-    setReviews((prev) => [...prev, newReview]);
     toast({
       title: "Review Submitted",
       description: "Your faculty review has been recorded.",
@@ -285,12 +371,13 @@ export default function StudentFacultyReviewPage() {
         <CardHeader className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
           <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
             <MessageSquare className="h-6 w-6 text-primary" />
-            {selectedFaculty && selectedCourse
-              ? `Rate ${
-                  facultyList.find((f) => f.id === parseInt(selectedFaculty))
-                    ?.name
-                } for ${selectedCourse}`
-              : "Rate Faculty"}
+            {selectedFaculty && selectedCourse && selectedSubject
+              ? `Rate  ${
+                  studentSubjectData.find(
+                    (s) => s.subjectId === selectedSubject
+                  )?.subjectName || ""
+                }`
+              : "Rate Subject"}
           </CardTitle>
         </CardHeader>
       </Card>
@@ -350,7 +437,7 @@ export default function StudentFacultyReviewPage() {
                     </Label>
                     <Select
                       value={selectedCourse}
-                      onValueChange={handleCourseChange}
+                      onValueChange={setSelectedCourse}
                       aria-label="Select course"
                     >
                       <SelectTrigger
@@ -360,11 +447,11 @@ export default function StudentFacultyReviewPage() {
                         <SelectValue placeholder="Select course" />
                       </SelectTrigger>
                       <SelectContent>
-                        {courses.map((course) => (
-                          <SelectItem key={course.name} value={course.name}>
-                            {course.name}
+                        {studentCourseData && (
+                          <SelectItem value={studentCourseData.courseId}>
+                            {studentCourseData.courseName}
                           </SelectItem>
-                        ))}
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -388,11 +475,16 @@ export default function StudentFacultyReviewPage() {
                         <SelectValue placeholder="Select subject" />
                       </SelectTrigger>
                       <SelectContent>
-                        {courses
-                          .find((course) => course.name === selectedCourse)
-                          ?.subjects.map((subject) => (
-                            <SelectItem key={subject.name} value={subject.name}>
-                              {subject.name}
+                        {studentSubjectData
+                          .filter(
+                            (subject) => subject.teacherId === selectedFaculty
+                          )
+                          .map((subject) => (
+                            <SelectItem
+                              key={subject.subjectId}
+                              value={subject.subjectId}
+                            >
+                              {subject.subjectName}
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -477,18 +569,31 @@ export default function StudentFacultyReviewPage() {
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-4 mt-4">
                 {reviews.length > 0 ? (
-                  reviews.map((review) => (
+                  reviews.map((review, index) => (
                     <Card
-                      key={review.id}
+                      key={
+                        review.id ??
+                        `${review.facultyId}-${review.studentId}` ??
+                        index
+                      }
                       className="bg-card shadow-sm rounded-lg transition-all duration-300 hover:shadow-md"
                     >
                       <CardContent className="p-4">
                         <p className="text-sm font-medium text-foreground">
                           {
-                            facultyList.find((f) => f.id === review.facultyId)
-                              ?.name
+                            facultyList.find(
+                              (f) => f.id.toString() === review.facultyId
+                            )?.name
                           }{" "}
-                          - {review.course} ({review.subject})
+                          -{" "}
+                          {studentCourseData?.courseId === review.courseId
+                            ? studentCourseData.courseName
+                            : "Unknown Course"}{" "}
+                          (
+                          {studentSubjectData.find(
+                            (s) => s.subjectId === review.subjectId
+                          )?.subjectName || "Unknown Subject"}
+                          )
                         </p>
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <p className="text-xs text-muted-foreground">
@@ -554,7 +659,7 @@ export default function StudentFacultyReviewPage() {
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
                           <span className="font-medium">Date:</span>{" "}
-                          {review.date}
+                          {review?.createdAt?.split("T")[0]}
                         </p>
                       </CardContent>
                     </Card>

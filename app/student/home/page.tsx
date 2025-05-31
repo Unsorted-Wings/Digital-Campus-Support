@@ -23,7 +23,7 @@ export default function HomePage() {
         `/api/students/viewStudent/viewStudentCourseInfo?studentId=${user.uid}`
       );
       const data = await response.json();
-      // console.log("Student Data:", data);
+
       setStudentData(data);
     } catch (error) {
       console.error("Error fetching student data:", error);
@@ -36,7 +36,7 @@ export default function HomePage() {
         `/api/schedule/viewSchedule/viewStudentSchedule/viewStudentTodaysSchedule?userId=${user.uid}`
       );
       const data = await response.json();
-      // console.log("Student Schedule:", data);
+    
       setFilteredEvents(data);
     } catch (error) {
       console.error("Error fetching student schedule:", error);
@@ -52,14 +52,13 @@ export default function HomePage() {
 
   useEffect(() => {
     if (user) {
-      console.log("User data:", user);
       fetchStudentData();
       fetchStudentSchedule();
     }
   }, [user]);
 
   const logOutClickHandler = async () => {
-    console.log("Logging out...");
+ 
     localStorage.removeItem("user");
     await signOut({ redirect: false });
     router.push("/login");
