@@ -90,7 +90,6 @@ const [allSubjects, setSubjects] =useState<Subject[]>([]);
      
 
     const data = await response.json();
-    const uid = user.uid; // assuming `user.id` is the Firebase Auth UID
 
       // Enhance assignment data with status
       const enhancedAssignments = data.map((assignment: any) => {
