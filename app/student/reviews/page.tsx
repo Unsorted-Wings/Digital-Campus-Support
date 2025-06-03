@@ -100,15 +100,13 @@ export default function StudentFacultyReviewPage() {
       );
 
       const data = await res.json();
-      setCurrentSemesterId(data.semesterDetailId);
       if (!res.ok) {
         throw new Error(data.error || "Failed to fetch semester detail");
       }
-
-      return data.semesterDetailId;
+      setCurrentSemesterId(data.semesterDetailId);
     } catch (error) {
       console.error("Error fetching semester detail:", error);
-      return null;
+     
     }
   };
   const fetchReviews = async () => {

@@ -10,13 +10,9 @@ export async function GET(req: NextRequest) {
     // 🔐 1. Authenticate Student
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    if (!token || token.role !== "student") {
-      return NextResponse.json(
-        { error: "Forbidden: Only students can access this" },
-        { status: 403 }
-      );
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
     // 📥 2. Extract query parameters
     const { searchParams } = new URL(req.url);
     const courseId = searchParams.get("courseId");

@@ -13,18 +13,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2️⃣ Check if the user has the 'admin' role
-    if (token.role !== "admin") {
+    // 2️⃣ Check if the user has the 'admin' or 'faculty' role
+    if (token.role !== "admin" && token.role !== "faculty") {
       return NextResponse.json(
-        { error: "Forbidden: Only admins can create marks" },
+        { error: "Forbidden: Only admins or faculty can create marks" },
         { status: 403 }
       );
     }
 
     // 3️⃣ Parse Request Body
-    const { studentId, examId, subjects } = await req.json();
+    const { courseId, batchId, subjectId, semesterId, students, category } =
+      await req.json();
 
-    if (!studentId || !examId || !subjects || !Array.isArray(subjects)) {
+    if (
+      !courseId ||
+      !batchId ||
+      !semesterId ||
+      !subjectId ||
+      !category ||
+      !Array.isArray(students)
+    ) {
       return NextResponse.json(
         { error: "Missing or invalid required fields" },
         { status: 400 }
@@ -33,15 +41,21 @@ export async function POST(req: NextRequest) {
 
     // 4️⃣ Create Marks Document in Firestore
     const now = new Date().toISOString();
-    const marksDoc = {
-      studentId,
-      examId,
-      subjects,
+
+    const newDocRef = firestore.collection("grades").doc();
+    const gradeId = newDocRef.id;
+    const gradesData = {
+      id: gradeId,
+      courseId,
+      batchId,
+      subjectId,
+      semesterId,
+      students,
+      category,
       createdAt: now,
       updatedAt: now,
     };
-
-    const newDocRef = await firestore.collection("marks").add(marksDoc);
+    await newDocRef.set(gradesData);
 
     return NextResponse.json(
       { message: "Marks created successfully", marksId: newDocRef.id },

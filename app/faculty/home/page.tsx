@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Bell, Calendar, Clock, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 
 export default function FacultyHomePage() {
   const [profile, setProfile] = useState<{
@@ -14,8 +16,10 @@ export default function FacultyHomePage() {
     role: string;
     email: string;
     avatar?: string;
+    subjects?: string[];
   } | null>(null);
   const subjects = ["Algebra", "Calculus", "Mechanics"];
+  const router = useRouter();
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -29,6 +33,7 @@ export default function FacultyHomePage() {
           avatar: `/faculty/${parsed.name
             .toLowerCase()
             .replace(/\s+/g, "-")}.jpg`,
+          subjects: parsed.subjects || [],
         });
       } catch (err) {
         console.error("Error parsing user from localStorage:", err);
@@ -57,6 +62,16 @@ export default function FacultyHomePage() {
     { title: "CS Project Review", due: "Apr 15, 2025", type: "warning" },
   ];
 
+  const logOutClickHandler = async () => {
+    try {
+      localStorage.removeItem("user");
+      await signOut({ redirect: false });
+      router.push("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-[1fr_2.5fr_1fr] gap-6">
       {/* Column 1: Profile Card */}
@@ -82,7 +97,7 @@ export default function FacultyHomePage() {
             <div className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">Subjects:</span>
               <div className="flex flex-wrap gap-2 mt-1">
-                {subjects.map((subject) => (
+                {profile?.subjects?.map((subject) => (
                   <Badge
                     key={subject}
                     variant="outline"
@@ -107,7 +122,7 @@ export default function FacultyHomePage() {
             <Button
               variant="outline"
               className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-lg transition-all duration-300"
-              onClick={() => alert("Logging out...")}
+              onClick={logOutClickHandler}
             >
               Log Out
             </Button>

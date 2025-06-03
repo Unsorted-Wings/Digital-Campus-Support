@@ -3,6 +3,10 @@ export type Resource = {
     name: string;
     type: string;
     description: string;
+    courseId: string;
+    batchId: string;
+    subjectId?: string;
+    semesterId: string;
     createdBy: string;
     fileUrl: string;
     createdAt: string;

@@ -23,13 +23,31 @@ export async function GET(req: NextRequest) {
   const userDoc = snapshot.docs[0];
   const user = userDoc.data();
 
+  // console.log(user);
+
   let courseId = null;
 
   // If student, fetch courseId from students collection
   if (user.role === "student") {
-    const studentDoc = await firestore.collection("students").doc(userDoc.id).get();
+    const studentDoc = await firestore
+      .collection("students")
+      .doc(userDoc.id)
+      .get();
     if (studentDoc.exists) {
       courseId = studentDoc.data()?.courseId ?? null;
+    }
+  }
+
+  if (user.role === "faculty") {
+    // Fetch subjects from faculty collection
+    const facultyDoc = await firestore
+      .collection("faculties")
+      .doc(userDoc.id)
+      .get();
+    if (facultyDoc.exists) {
+      user.subjects = facultyDoc.data()?.subjects || [];
+    } else {
+      user.subjects = [];
     }
   }
 
@@ -38,6 +56,7 @@ export async function GET(req: NextRequest) {
     email: user.email,
     name: user.name,
     role: user.role,
-    ...(user.role === "student" && { courseId }), // Only include courseId if student
+    ...(user.role === "student" && { courseId }),
+    ...(user.role === "faculty" && { subjects: user.subjects || [] }),
   });
 }

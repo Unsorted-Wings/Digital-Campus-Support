@@ -58,11 +58,14 @@ export default function HomePage() {
   }, [user]);
 
   const logOutClickHandler = async () => {
- 
+  try {
     localStorage.removeItem("user");
     await signOut({ redirect: false });
     router.push("/login");
-  };
+  } catch (error) {
+    console.error("Logout failed:", error);
+  }
+};
 
   const profile = {
     name: user?.name || "",
