@@ -9,17 +9,40 @@ import { Bell, Calendar, Clock, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { format, parseISO } from "date-fns";
 
 export default function FacultyHomePage() {
   const [profile, setProfile] = useState<{
+    id: string;
     name: string;
     role: string;
     email: string;
     avatar?: string;
     subjects?: string[];
   } | null>(null);
+  const [filteredEvents, setFilteredEvents] = useState<any[]>([]);
   const subjects = ["Algebra", "Calculus", "Mechanics"];
   const router = useRouter();
+
+  const fetchTodaySchedule = async () => {
+    try {
+      const response = await fetch(
+        `/api/schedule/viewSchedule/viewTodaysSchedule?userId=${profile?.id}`
+      );
+      const data = await response.json();
+      console.log("Today's Schedule Data:", data);
+
+      setFilteredEvents(data);
+    } catch (error) {
+      console.error("Error fetching student schedule:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (profile) {
+      fetchTodaySchedule();
+    }
+  }, [profile]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -27,6 +50,7 @@ export default function FacultyHomePage() {
       try {
         const parsed = JSON.parse(storedUser);
         setProfile({
+          id: parsed.uid,
           name: parsed.name,
           role: parsed.role,
           email: parsed.email,
@@ -41,16 +65,11 @@ export default function FacultyHomePage() {
     }
   }, []);
 
-  const schedule = [
-    {
-      time: "09:00 AM",
-      event: "Mathematics 101 Lecture",
-      location: "Room 101",
-    },
-    { time: "11:00 AM", event: "Physics 201 Lab", location: "Lab B" },
-    { time: "02:00 PM", event: "CS 301 Office Hours", location: "Office 305" },
-    { time: "04:00 PM", event: "Faculty Meeting", location: "Conference Room" },
-  ];
+  const schedule = filteredEvents.map((event) => ({
+    time: format(parseISO(event.start), "hh:mm a"),
+    event: event.title,
+    location: event.location || "", // fallback to empty if not present
+  }));
 
   const notifications = [
     {
@@ -130,7 +149,6 @@ export default function FacultyHomePage() {
         </CardContent>
         <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-20 pointer-events-none" />
       </Card>
-
       {/* Column 2: Schedule */}
       <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl h-[calc(100vh-5rem)] overflow-y-auto">
         <CardHeader className="border-b border-border sticky top-0 bg-card/95 z-10">

@@ -1,3 +1,4 @@
+
 export interface CalendarEvent {
     id: string;              // Unique identifier (same as Firestore doc ID)
     userId: string;         // UID of the user (Firebase Auth UID)
@@ -9,7 +10,7 @@ export interface CalendarEvent {
     
     createdBy: string;       // UID of the creator (Firebase Auth UID)
     category?: "lecture" | "exam" | "meeting" | "holiday" | "other";  // Event type
-    status: "scheduled" | "completed" | "canceled";  // Event status
+    
     visibility: "public" | "private";  // Visibility of event
       // Timestamp of last update
     recurring?: {

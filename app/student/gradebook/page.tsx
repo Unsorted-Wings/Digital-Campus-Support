@@ -27,35 +27,6 @@ export default function GradebookPage() {
   const [areTermEndMarkFetched, setAreTermEndMarksFetched] =
     useState<boolean>(false);
   const [overallGPA, setOverallGPA] = useState<number>(0);
-  // Mock data (replace with real data from backend)
-  const grades = {
-    summary: [
-      {
-        subject: "Mathematics",
-        sessional1: 85,
-        sessional2: 92,
-        termEnd: 88,
-        attendance: 4,
-        assignments: 5,
-      },
-      {
-        subject: "Physics",
-        sessional1: 78,
-        sessional2: 82,
-        termEnd: 85,
-        attendance: 5,
-        assignments: 4,
-      },
-      {
-        subject: "Computer Science",
-        sessional1: 90,
-        sessional2: 87,
-        termEnd: 91,
-        attendance: 5,
-        assignments: 5,
-      },
-    ],
-  };
 
   const fetchStudentCourseDetails = async () => {
     try {
@@ -103,7 +74,7 @@ export default function GradebookPage() {
       if (!res.ok) {
         throw new Error(data.error || "Failed to fetch grades");
       }
-     
+
       setFetchedGrades(data);
     } catch (error) {
       console.error("Error fetching grades:", error);
@@ -126,7 +97,6 @@ export default function GradebookPage() {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       setUser(JSON.parse(storedUser));
-    
     }
   }, []);
 
@@ -251,7 +221,6 @@ export default function GradebookPage() {
   const calculateOverallGPA = () => {
     try {
       const summary = structuredGrades?.summary || [];
-     
 
       if (summary.length === 0) return 0;
 
@@ -264,7 +233,6 @@ export default function GradebookPage() {
           curr.assignments,
           areTermEndMarkFetched
         );
-
 
         const gpa = areTermEndMarkFetched
           ? (finalMarks / 100) * 10
@@ -285,7 +253,7 @@ export default function GradebookPage() {
     if (structuredGrades?.summary?.length > 0) {
       const gpa = calculateOverallGPA();
       setOverallGPA(gpa);
-    } 
+    }
   }, [structuredGrades, areTermEndMarkFetched]);
 
   return (

@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Toast } from "@/components/ui/toast"; // Mock toast import
 import { toast } from "@/hooks/use-toast";
 
 interface Faculty {

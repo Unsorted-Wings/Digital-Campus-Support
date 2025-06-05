@@ -14,20 +14,10 @@ export async function POST(req: NextRequest) {
     // 2️⃣ Only admin users can create calendar events
 
     // 3️⃣ Extract event details from request body
-    const {
-      title,
-      description,
-      start,
-      end,
-      allDay,
-      category,
-      status,
-      visibility,
-      recurring,
-      userIds,
-    } = await req.json();
+    const { title, description, start, end, recurring, category } =
+      await req.json();
 
-    if (!title || !start || allDay === undefined || !status || !visibility) {
+    if (!title || !start || !end) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -37,19 +27,17 @@ export async function POST(req: NextRequest) {
     // 4️⃣ Prepare event object
     const id = firestore.collection("calendarEvents").doc().id;
     const now = new Date().toISOString();
-   
+
     const event = {
       id,
-      userIds, // user ID from NextAuth token
+      userIds: token.id, // user ID from NextAuth token
       title,
       description: description || "",
       start,
-      end: end || "",
-      allDay,
-      createdBy: token.sub,
+      end,
+      createdBy: token.id,
       category: category || "other",
-      status,
-      visibility,
+      visibility: "private",
       recurring: recurring || null,
       createdAt: now,
       updatedAt: now,

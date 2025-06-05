@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +51,7 @@ import {
   startOfDay,
 } from "date-fns";
 import { title } from "process";
+import { Description } from "@radix-ui/react-dialog";
 
 export default function SchedulePage() {
   const [view, setView] = useState<"daily" | "weekly" | "monthly">("weekly");
@@ -93,8 +95,44 @@ export default function SchedulePage() {
     subject: "",
   });
   const [eventError, setEventError] = useState("");
-  const [user, setUser] = useState<any>(null);
   const [studentData, setStudentData] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
+  const [studentCourseData, setStudentCourseData] = useState<any>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string>("");
+  const [currentSemesterId, setCurrentSemesterId] = useState<string | null>(
+    null
+  );
+
+  const fetchStudentCourseDetails = async () => {
+    try {
+      const response = await fetch(
+        `/api/batch/viewBatch/viewStudentBatchDetail?studentId=${user.uid}`
+      );
+      const data = await response.json();
+      setStudentCourseData(data);
+    } catch (error) {
+      console.error("Error fetching student course details:", error);
+    }
+  };
+
+  const fetchStudentCurrentSemester = async () => {
+    try {
+      const res = await fetch(
+        `/api/semesterDetail/viewSemesterDetail/viewStudentCurrentSemester/?courseId=${studentCourseData?.courseId}&batchId=${studentCourseData?.batchId}`,
+        {
+          method: "GET",
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch semester detail");
+      }
+      setCurrentSemesterId(data.semesterDetailId);
+    } catch (error) {
+      console.error("Error fetching semester detail:", error);
+    }
+  };
 
   function dayStringToIndex(day: string) {
     const map: Record<string, number> = {
@@ -217,7 +255,7 @@ export default function SchedulePage() {
           );
           const data = await response.json();
 
-          setStudentData(data);
+          // setStudentData(data);
 
           const allEvents = expandRecurringEvents(data);
           setEvents(allEvents);
@@ -232,13 +270,23 @@ export default function SchedulePage() {
   }, [user]);
 
   useEffect(() => {
+    if (user) {
+      fetchStudentCourseDetails();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && studentCourseData) {
+      fetchStudentCurrentSemester();
+    }
+  }, [user, studentCourseData]);
+
+  useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
   }, []);
-
-  const subjects = ["Mathematics", "Physics", "Computer Science", "General"];
 
   const navigate = (direction: "prev" | "next") => {
     switch (view) {
@@ -279,23 +327,51 @@ export default function SchedulePage() {
     return format(currentDate, "MMMM yyyy");
   };
 
+  const createNewEvent = async (eventData: any) => {
+    try {
+      const response = await fetch(
+        "/api/schedule/createSchedule/createPersonalSchedule",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(eventData),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Something went wrong");
+      }
+      return result;
+    } catch (error) {
+      console.error("Error creating event:", error);
+    }
+  };
+
   const handleAddEvent = () => {
     if (!newEvent.title.trim()) {
       setEventError("Event title is required.");
+      console.error("Event title is required.");
       return;
     }
     if (!newEvent.start || !newEvent.end) {
       setEventError("Start and end times are required.");
+      console.error("Start and end times are required.");
       return;
     }
     const startDate = new Date(newEvent.start);
     const endDate = new Date(newEvent.end);
     if (startDate > endDate) {
       setEventError("End time must be after start time.");
+      console.error("End time must be after start time.");
       return;
     }
     if (!newEvent.subject) {
       setEventError("Subject is required.");
+      console.error("Subject is required.");
       return;
     }
     const newEventData = {
@@ -305,18 +381,21 @@ export default function SchedulePage() {
       end: endDate,
       subject: newEvent.subject,
     };
+
+    console.log("New Event Data:", newEventData);
     setEvents([...events, newEventData]);
     setNewEvent({ title: "", start: "", end: "", subject: "" });
     setShowAddEvent(false);
     setEventError("");
 
     const dataToSend = {
-      userId: user.uid,
       title: newEventData.title,
       start: newEventData.start,
       end: newEventData.end,
-      subject: newEvent.subject,
+      description: title + " " + selectedSubject,
     };
+
+    createNewEvent(dataToSend);
   };
 
   const expandedEvents = expandRecurringEvents(events);
@@ -634,11 +713,16 @@ export default function SchedulePage() {
         <DialogContent className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl max-w-md">
           <DialogHeader>
             <DialogTitle className="text-foreground">Add New Event</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Fill in the event details below and click "Create" to schedule it.
+            </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4 p-4">
             {eventError && (
               <p className="text-destructive text-sm">{eventError}</p>
             )}
+
             <div>
               <Label htmlFor="title" className="text-foreground">
                 Title
@@ -653,6 +737,7 @@ export default function SchedulePage() {
                 className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
               />
             </div>
+
             <div>
               <Label htmlFor="start" className="text-foreground">
                 Start Time
@@ -667,6 +752,7 @@ export default function SchedulePage() {
                 className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
               />
             </div>
+
             <div>
               <Label htmlFor="end" className="text-foreground">
                 End Time
@@ -681,15 +767,22 @@ export default function SchedulePage() {
                 className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
               />
             </div>
+
             <div>
               <Label htmlFor="subject" className="text-foreground">
                 Subject
               </Label>
               <Select
                 value={newEvent.subject}
-                onValueChange={(value) =>
-                  setNewEvent({ ...newEvent, subject: value })
-                }
+                onValueChange={(value) => {
+                  const selected = studentSubjects.find(
+                    (subject) => subject.id === value
+                  );
+                  setNewEvent({ ...newEvent, subject: value });
+                  if (selected) {
+                    setSelectedSubject(selected.name);
+                  }
+                }}
               >
                 <SelectTrigger className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg">
                   <SelectValue placeholder="Select subject" />
@@ -703,6 +796,7 @@ export default function SchedulePage() {
                 </SelectContent>
               </Select>
             </div>
+
             <DialogFooter>
               <Button
                 variant="outline"

@@ -33,10 +33,10 @@ export default function HomePage() {
   const fetchStudentSchedule = async () => {
     try {
       const response = await fetch(
-        `/api/schedule/viewSchedule/viewStudentSchedule/viewStudentTodaysSchedule?userId=${user.uid}`
+        `/api/schedule/viewSchedule/viewTodaysSchedule?userId=${user.uid}`
       );
       const data = await response.json();
-    
+
       setFilteredEvents(data);
     } catch (error) {
       console.error("Error fetching student schedule:", error);
@@ -58,14 +58,14 @@ export default function HomePage() {
   }, [user]);
 
   const logOutClickHandler = async () => {
-  try {
-    localStorage.removeItem("user");
-    await signOut({ redirect: false });
-    router.push("/login");
-  } catch (error) {
-    console.error("Logout failed:", error);
-  }
-};
+    try {
+      localStorage.removeItem("user");
+      await signOut({ redirect: false });
+      router.push("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   const profile = {
     name: user?.name || "",
