@@ -17,7 +17,6 @@ import Link from "next/link";
 import { Room } from "@/models/room";
 import { realtimeDB } from "@/lib/firebase/firebaseConfig";
 import { ref, onValue } from "firebase/database";
-import { read } from "fs";
 
 interface Message {
   id: string;
@@ -33,7 +32,7 @@ interface Message {
   };
   createdAt: string;
   updatedAt: string;
-  readBy?: string[];
+  readBy: string[];
 
   pollOptions?: {
     id: string;
@@ -81,6 +80,7 @@ export default function ChatPage() {
 
         const data = await res.json();
         setRooms(data);
+        console.log("Fetched rooms:", data);
       } catch (err: any) {
         console.error(err.message);
       }
@@ -133,7 +133,41 @@ export default function ChatPage() {
     };
   }, [selectedChat]);
 
-  const currentUserId = 1;
+  // update read status when messages change
+  useEffect(() => {
+    if (!user || !selectedChat || messages.length === 0) return;
+
+    const unreadMessageIds = messages
+      .filter((msg) => !msg.readBy?.includes(user.uid))
+      .map((msg) => msg.id);
+
+    if (unreadMessageIds.length === 0) return;
+
+    const updateReadStatus = async () => {
+      try {
+        const res = await fetch("/api/chat/updateChat/readBy", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            roomId: selectedChat.id,
+            chatIds: unreadMessageIds,
+            userId: user.uid,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          console.error("Failed to update read status:", data.error);
+        }
+      } catch (err) {
+        console.error("Read status update error:", err);
+      }
+    };
+
+    updateReadStatus();
+  }, [messages, user, selectedChat]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -185,7 +219,6 @@ export default function ChatPage() {
       console.error("Error sending message:", err);
     }
   };
-
 
   const handleCreatePoll = async () => {
     if (!selectedChat || !user) {
@@ -271,12 +304,11 @@ export default function ChatPage() {
 
       if (!res.ok) {
         console.error("Vote failed:", data.error);
-      } 
+      }
     } catch (err) {
       console.error("Vote error:", err);
     }
   };
-
 
   async function handleReactMessage(chatId: string, emoji: string) {
 
@@ -294,7 +326,7 @@ export default function ChatPage() {
     const data = await res.json();
     if (data.error) {
       console.error('Failed to update reaction:', data.error);
-    } 
+    }
   }
 
   const renderMessageContent = (text: string) => {
@@ -350,9 +382,13 @@ export default function ChatPage() {
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-foreground font-medium truncate">{room.name}</p>
-                <p className="text-xs text-muted-foreground truncate">temp</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {room.lastMessage?.type === "poll"
+                    ? "📊 Poll"
+                    : room.lastMessage?.message || "No messages yet"}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground flex-shrink-0">tempTime</p>
+              <p className="text-xs text-muted-foreground flex-shrink-0">{formatTimestamp(room.lastMessage?.updatedAt ?? "")}</p>
             </div>
           ))}
         </ScrollArea>
@@ -383,164 +419,169 @@ export default function ChatPage() {
           </CardHeader>
           <ScrollArea className="flex-1 p-6 h-full min-h-0" ref={scrollRef}>
             <div className="space-y-4">
-              {messages
-                .filter((msg) => msg.roomId === selectedChat.id)
-                .map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={cn(
-                      "flex items-end gap-2",
-                      msg.isSent ? "justify-end" : "justify-start"
-                    )}
-                  >
-                    {!msg.isSent && (
-                      <Avatar className="w-8 h-8 flex-shrink-0">
-                        <AvatarImage src={`/user-${msg.senderId}.jpg`} alt={msg.senderName} />
-                        <AvatarFallback className="bg-primary/20 text-primary">
-                          {msg.senderName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-                    {msg.type === "message" ? (
-                      <div
-                        className={cn(
-                          "max-w-[70%] p-3 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md",
-                          msg.isSent
-                            ? "bg-gradient-to-r from-primary/80 to-primary/60 text-primary-foreground rounded-tr-none"
-                            : "bg-muted/70 text-foreground rounded-tl-none"
-                        )}
-                      >
-                        <p className="text-xs font-medium">{msg.senderName}</p>
-                        <p className="text-sm mt-1">{renderMessageContent(msg.message || "")}</p>
-                        <div className="flex items-center gap-1 mt-1 justify-end">
-                          <p className="text-xs text-muted-foreground">{formatTimestamp(msg.updatedAt)}</p>
-                          {msg.isSent && (
-                            <CheckCheck
-                              className={cn(
-                                "h-4 w-4",
-                                msg.readBy?.length === selectedChat.members.length
-                                  ? "text-primary"
-                                  : "text-muted-foreground"
-                              )}
-                            />
-                          )}
-                        </div>
-                        {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                          <div className="flex gap-2 mt-1">
-                            {Object.entries(msg.reactions)
-                              .filter(([_, userIds]) => Array.isArray(userIds) && userIds.length > 0)
-                              .map(([emoji, userIds]) => (
-                                <span key={emoji} className="text-xs">
-                                  {emoji} {userIds.length}
-                                </span>
-                              ))}
-                          </div>
-                        )}
-                        <Select
-                          onValueChange={(emoji) => handleReactMessage(msg.id, emoji)}
-                        >
-                          <SelectTrigger className="w-10 h-6 p-0 border-none bg-transparent">
-                            <Smile className="h-4 w-4 text-muted-foreground" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {["👍", "❤️", "😂"].map((emoji) => (
-                              <SelectItem key={emoji} value={emoji}>{emoji}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : (
-                      <div
-                        className={cn(
-                          "max-w-[70%] p-4 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md",
-                          msg.isSent
-                            ? "bg-gradient-to-r from-primary/10 to-secondary/10 text-foreground rounded-tr-none"
-                            : "bg-muted/70 text-foreground rounded-tl-none"
-                        )}
-                      >
-                        <p className="text-xs font-medium">{msg.senderName}</p>
-                        <p className="text-sm font-semibold mt-1">{msg.message}</p>
-                        <div className="mt-3 space-y-2">
-                          {msg.pollOptions?.map((opt, idx) => {
-                            const totalVotes = msg.pollOptions?.reduce((sum, o) => sum + o.votes.length, 0) || 0;
-                            const percentage = totalVotes ? (opt.votes.length / totalVotes) * 100 : 0;
-                            const userVoted = user?.uid ? opt.votes.includes(user.uid) : false;
 
-                            return (
-                              <div
-                                key={idx}
-                                className="flex items-center gap-2 p-2 bg-muted/50 rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-200"
-                                onClick={() => handleVote(msg.id, idx)}
-                              >
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    {userVoted && <Check className="h-4 w-4 text-primary" />}
-                                    <span className="text-sm text-foreground">
-                                      {opt.text}
-                                    </span>
+              {
+                messages.filter((msg) => msg.roomId === selectedChat?.id).length === 0 ? (
+                  <div className="text-center text-sm text-muted mt-4">No messages yet</div>
+                ) : (messages.filter((msg) => msg.roomId === selectedChat.id)
+                  .map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={cn(
+                        "flex items-end gap-2",
+                        msg.isSent ? "justify-end" : "justify-start"
+                      )}
+                    >
+                      {!msg.isSent && (
+                        <Avatar className="w-8 h-8 flex-shrink-0">
+                          <AvatarImage src={`/user-${msg.senderId}.jpg`} alt={msg.senderName} />
+                          <AvatarFallback className="bg-primary/20 text-primary">
+                            {msg.senderName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      {msg.type === "message" ? (
+                        <div
+                          className={cn(
+                            "max-w-[70%] p-3 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md",
+                            msg.isSent
+                              ? "bg-gradient-to-r from-primary/80 to-primary/60 text-primary-foreground rounded-tr-none"
+                              : "bg-muted/70 text-foreground rounded-tl-none"
+                          )}
+                        >
+                          <p className="text-xs font-medium">{msg.senderName}</p>
+                          <p className="text-sm mt-1">{renderMessageContent(msg.message || "")}</p>
+                          <div className="flex items-center gap-1 mt-1 justify-end">
+                            <p className="text-xs text-muted-foreground">{formatTimestamp(msg.updatedAt)}</p>
+                            {msg.isSent && (
+                              <CheckCheck
+                                className={cn(
+                                  "h-4 w-4",
+                                  msg.readBy?.length === selectedChat.members.length
+                                    ? "text-primary"
+                                    : "text-muted-foreground"
+                                )}
+                              />
+                            )}
+                          </div>
+                          {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                            <div className="flex gap-2 mt-1">
+                              {Object.entries(msg.reactions)
+                                .filter(([_, userIds]) => Array.isArray(userIds) && userIds.length > 0)
+                                .map(([emoji, userIds]) => (
+                                  <span key={emoji} className="text-xs">
+                                    {emoji} {userIds.length}
+                                  </span>
+                                ))}
+                            </div>
+                          )}
+                          <Select
+                            onValueChange={(emoji) => handleReactMessage(msg.id, emoji)}
+                          >
+                            <SelectTrigger className="w-10 h-6 p-0 border-none bg-transparent">
+                              <Smile className="h-4 w-4 text-muted-foreground" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {["👍", "❤️", "😂"].map((emoji) => (
+                                <SelectItem key={emoji} value={emoji}>{emoji}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <div
+                          className={cn(
+                            "max-w-[70%] p-4 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md",
+                            msg.isSent
+                              ? "bg-gradient-to-r from-primary/10 to-secondary/10 text-foreground rounded-tr-none"
+                              : "bg-muted/70 text-foreground rounded-tl-none"
+                          )}
+                        >
+                          <p className="text-xs font-medium">{msg.senderName}</p>
+                          <p className="text-sm font-semibold mt-1">{msg.message}</p>
+                          <div className="mt-3 space-y-2">
+                            {msg.pollOptions?.map((opt, idx) => {
+                              const totalVotes = msg.pollOptions?.reduce((sum, o) => sum + o.votes.length, 0) || 0;
+                              const percentage = totalVotes ? (opt.votes.length / totalVotes) * 100 : 0;
+                              const userVoted = user?.uid ? opt.votes.includes(user.uid) : false;
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className="flex items-center gap-2 p-2 bg-muted/50 rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-200"
+                                  onClick={() => handleVote(msg.id, idx)}
+                                >
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      {userVoted && <Check className="h-4 w-4 text-primary" />}
+                                      <span className="text-sm text-foreground">
+                                        {opt.text}
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-muted/30 h-1.5 rounded-full mt-1">
+                                      <div
+                                        className={cn(
+                                          "h-1.5 rounded-full",
+                                          userVoted ? "bg-primary/50" : "bg-primary/30"
+                                        )}
+                                        style={{ width: `${percentage}%` }}
+                                      />
+                                    </div>
                                   </div>
-                                  <div className="w-full bg-muted/30 h-1.5 rounded-full mt-1">
-                                    <div
-                                      className={cn(
-                                        "h-1.5 rounded-full",
-                                        userVoted ? "bg-primary/50" : "bg-primary/30"
-                                      )}
-                                      style={{ width: `${percentage}%` }}
-                                    />
-                                  </div>
+                                  <span className="text-xs text-muted-foreground">{opt.votes.length} votes</span>
                                 </div>
-                                <span className="text-xs text-muted-foreground">{opt.votes.length} votes</span>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
 
-                        </div>
-                        <div className="flex items-center gap-1 mt-2 justify-end">
-                          <p className="text-xs text-muted-foreground">{formatTimestamp(msg.updatedAt)}</p>
-                          {msg.isSent && (
-                            <CheckCheck
-                              className={cn(
-                                "h-4 w-4",
-                                msg.readBy?.length === selectedChat.members.length
-                                  ? "text-primary"
-                                  : "text-muted-foreground"
-                              )}
-                            />
-                          )}
-                        </div>
-                        {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                          <div className="flex gap-2 mt-1">
-                            {Object.entries(msg.reactions)
-                              .filter(([_, userIds]) => Array.isArray(userIds) && userIds.length > 0)
-                              .map(([emoji, userIds]) => (
-                                <span key={emoji} className="text-xs">
-                                  {emoji} {userIds.length}
-                                </span>
-                              ))}
                           </div>
-                        )}
-                        <Select
-                          onValueChange={(emoji) => handleReactMessage(msg.id, emoji)}
-                        >
-                          <SelectTrigger className="w-10 h-6 p-0 border-none bg-transparent">
-                            <Smile className="h-4 w-4 text-muted-foreground" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {["👍", "❤️", "😂"].map((emoji) => (
-                              <SelectItem key={emoji} value={emoji}>{emoji}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    {msg.isSent && (
-                      <Avatar className="w-8 h-8 flex-shrink-0">
-                        <AvatarImage src="/user-you.jpg" alt="You" />
-                        <AvatarFallback className="bg-primary/20 text-primary">{msg.senderName.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
-                ))}
+                          <div className="flex items-center gap-1 mt-2 justify-end">
+                            <p className="text-xs text-muted-foreground">{formatTimestamp(msg.updatedAt)}</p>
+                            {msg.isSent && (
+                              <CheckCheck
+                                className={cn(
+                                  "h-4 w-4",
+                                  msg.readBy?.length === selectedChat.members.length
+                                    ? "text-primary"
+                                    : "text-muted-foreground"
+                                )}
+                              />
+                            )}
+                          </div>
+                          {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                            <div className="flex gap-2 mt-1">
+                              {Object.entries(msg.reactions)
+                                .filter(([_, userIds]) => Array.isArray(userIds) && userIds.length > 0)
+                                .map(([emoji, userIds]) => (
+                                  <span key={emoji} className="text-xs">
+                                    {emoji} {userIds.length}
+                                  </span>
+                                ))}
+                            </div>
+                          )}
+                          <Select
+                            onValueChange={(emoji) => handleReactMessage(msg.id, emoji)}
+                          >
+                            <SelectTrigger className="w-10 h-6 p-0 border-none bg-transparent">
+                              <Smile className="h-4 w-4 text-muted-foreground" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {["👍", "❤️", "😂"].map((emoji) => (
+                                <SelectItem key={emoji} value={emoji}>{emoji}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      {msg.isSent && (
+                        <Avatar className="w-8 h-8 flex-shrink-0">
+                          <AvatarImage src="/user-you.jpg" alt="You" />
+                          <AvatarFallback className="bg-primary/20 text-primary">{msg.senderName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
+                  )))
+              }
+
               {isTyping && (
                 <div className="text-sm text-muted-foreground italic">Typing...</div>
               )}
