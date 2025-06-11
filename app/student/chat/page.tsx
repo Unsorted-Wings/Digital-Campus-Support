@@ -15,8 +15,7 @@ import { useState, useEffect, useRef } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import Link from "next/link";
 import { Room } from "@/models/room";
-import { realtimeDB } from "@/lib/firebase/firebaseConfig";
-import { ref, onValue } from "firebase/database";
+import { fetchMessages } from "@/lib/chat/fetchChat";
 
 interface Message {
   id: string;
@@ -80,7 +79,6 @@ export default function ChatPage() {
 
         const data = await res.json();
         setRooms(data);
-        console.log("Fetched rooms:", data);
       } catch (err: any) {
         console.error(err.message);
       }
@@ -93,45 +91,18 @@ export default function ChatPage() {
   useEffect(() => {
     if (!selectedChat) return;
 
-    const messagesRef = ref(realtimeDB, `chats/${selectedChat.id}`);
-
-    // Listen for realtime updates
-    const unsubscribe = onValue(messagesRef, (snapshot) => {
-      const data = snapshot.val();
-
-      if (!data) {
-        setMessages([]);
-        return;
+    const unsubscribe = fetchMessages(
+      selectedChat.id,
+      user?.uid,
+      (fetchedMessages) => {
+        setMessages(fetchedMessages);
       }
-      // Map Firebase object to array of messages
-      const loadedMessages: Message[] = Object.entries(data).map(([key, value]: [string, any]) => ({
-        id: value.id,
-        senderId: value.senderId,
-        senderName: value.senderName,
-        message: value.message,
-        roomId: value.roomId,
-        type: value.type,
-        reactions: value.reaction,
-        timestamp: value.timestamp,
-        createdAt: value.createdAt,
-        updatedAt: value.updatedAt,
-        readBy: value.readBy,
-        isSent: value.senderId === user?.uid,
-        pollOptions: value.pollOptions ? value.pollOptions.map((opt: any) => ({
-          id: opt.id,
-          text: opt.text,
-          votes: opt.votes || [],
-        })) : undefined,
-        allowsMultipleVotes: value.allowsMultipleVotes || false,
-      }));
-
-      setMessages(loadedMessages);
-    });
+    );
 
     return () => {
       unsubscribe();
     };
-  }, [selectedChat]);
+  }, [selectedChat, user?.uid]);
 
   // update read status when messages change
   useEffect(() => {
@@ -178,6 +149,8 @@ export default function ChatPage() {
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
+
+    if (isNaN(date.getTime())) return "";
     if (isToday(date)) return format(date, "HH:mm");
     if (isYesterday(date)) return `Yesterday ${format(date, "HH:mm")}`;
     return format(date, "MMM d, yyyy HH:mm");
@@ -347,7 +320,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-5rem)] gap-6 p-6 bg-background">
+    <div className="flex h-[calc(100vh-6.5rem)] gap-6 p-6 bg-background">
       {/* Sidebar */}
       <Card className="w-[300px] bg-card/95 backdrop-blur-md shadow-xl rounded-xl border-r border-border/50 flex flex-col">
         <CardHeader className="p-4 border-b border-border/30">
@@ -383,9 +356,14 @@ export default function ChatPage() {
               <div className="flex-1 min-w-0">
                 <p className="text-foreground font-medium truncate">{room.name}</p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {room.lastMessage?.type === "poll"
-                    ? "📊 Poll"
-                    : room.lastMessage?.message || "No messages yet"}
+                  {room.lastMessage
+                    ? `${room.lastMessage.senderName}: ${room.lastMessage.type === "poll"
+                      ? "📊 Poll"
+                      : room.lastMessage.message
+                    }`
+                    : "No messages yet"
+                  }
+
                 </p>
               </div>
               <p className="text-xs text-muted-foreground flex-shrink-0">{formatTimestamp(room.lastMessage?.updatedAt ?? "")}</p>
@@ -417,7 +395,7 @@ export default function ChatPage() {
               </Button>
             </div>
           </CardHeader>
-          <ScrollArea className="flex-1 p-6 h-full min-h-0" ref={scrollRef}>
+          <ScrollArea className="flex-1 p-6 h-full min-h-0 " ref={scrollRef}>
             <div className="space-y-4">
 
               {
@@ -588,35 +566,37 @@ export default function ChatPage() {
             </div>
           </ScrollArea>
           <CardContent className="p-4 border-t border-border/30 bg-card/95">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => setShowPollDialog(true)}
-                className="text-foreground hover:bg-primary/20 rounded-full p-2"
-              >
-                <BarChart2 className="h-5 w-5" />
-              </Button>
-              <Input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 bg-muted/50 border-border rounded-full shadow-sm focus:ring-2 focus:ring-primary transition-all duration-300"
-                onKeyPress={(e) => e.key === "Enter" && handleSend()}
-              />
-              <Button
-                onClick={handleSend}
-                className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:bg-primary/90 rounded-full shadow-sm hover:shadow-md transition-all duration-300 p-2"
-              >
-                <Send className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setIsTyping(!isTyping)}
-                className="text-muted-foreground hover:bg-primary/20 rounded-full p-2"
-              >
-                Toggle Typing
-              </Button>
-            </div>
+
+            {selectedChat.type !== "announcements" ?
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowPollDialog(true)}
+                  className="text-foreground hover:bg-primary/20 rounded-full p-2"
+                >
+                  <BarChart2 className="h-5 w-5" />
+                </Button>
+                <Input
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 bg-muted/50 border-border rounded-full shadow-sm focus:ring-2 focus:ring-primary transition-all duration-300"
+                  onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                />
+                <Button
+                  onClick={handleSend}
+                  className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:bg-primary/90 rounded-full shadow-sm hover:shadow-md transition-all duration-300 p-2"
+                >
+                  <Send className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsTyping(!isTyping)}
+                  className="text-muted-foreground hover:bg-primary/20 rounded-full p-2"
+                >
+                  Toggle Typing
+                </Button>
+              </div> : "You cannot send message to this group"}
           </CardContent>
         </Card>
       ) : (
