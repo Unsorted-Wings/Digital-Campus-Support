@@ -26,6 +26,7 @@ import {
   CheckCircle,
   Filter,
   ArrowUpDown,
+  Loader2
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -34,8 +35,26 @@ interface Assignment {
   id: number;
   title: string;
   subject: string;
+  subjectId: string;
   dueDate: string;
   status: string;
+  semesterId: string;
+  submittedBy?: Submission[];
+  assignmentDocUrl?: string | null;
+  courseId: string;
+  batchId?: string;
+  createdAt?: string;
+  description?: string;
+  teacherId?: string;
+  updatedAt?: string;
+
+}
+interface Submission {
+  userId: number;
+  uploadedAt: string;
+  assignmentDocUrl: string;
+  grade?: number;
+  resource_id?: string;
 }
 type Subject = {
   id: string;
@@ -50,48 +69,58 @@ export default function AssignmentSubmissionPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [assignments, setAssignments] = useState<Assignment[]>([]); // State to store assignments
-  const [loadingAssignments, setLoadingAssignments] = useState(false); // State for loading assignments
   const [filterSubject, setFilterSubject] = useState<string>("All");
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [sortField, setSortField] = useState<string>("dueDate");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-const [allSubjects, setSubjects] =useState<Subject[]>([]);
+  const [allSubjects, setSubjects] = useState<Subject[]>([]);
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
 
-  // const [uid, setUid] = useState<string | null>(null);
-  // const [courseId, setCourseId] = useState<string | null>(null);
- 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{
+    id: string;
+    name: string;
+    role: string;
+    courseId?: string;
+  } | null>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsed = JSON.parse(storedUser);
+        console.log("Parsed user from localStorage:", parsed);
+        setUser({
+          id: parsed.uid,
+          name: parsed.name,
+          role: parsed.role,
+          courseId: parsed.courseId,
+        });
+      } catch (err) {
+        console.error("Error parsing user from localStorage:", err);
+      }
     }
   }, []);
 
   const fetchAssignments = async () => {
-     const storedUser = localStorage.getItem("user");
+    const storedUser = localStorage.getItem("user");
     const parsedUser = storedUser ? JSON.parse(storedUser) : null;
     const uid = parsedUser?.uid || null;
     const courseId = parsedUser?.courseId || null;
 
-    // setUid(uidFromStorage);
-    // setCourseId(courseIdFromStorage);
-    setLoadingAssignments(true);
+    setIsLoadingAssignments(true);
+     setIsLoadingAssignments(true);
     try {
       console.log("course id : ", courseId);
       if (!courseId || !uid) throw new Error("Course ID not found in local storage");
 
-    const response = await fetch(`/api/assignment/viewAssignment?courseId=${courseId}`);
+      const response = await fetch(`/api/assignment/viewAssignment?courseId=${courseId}`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch assignments: ${response.status}`);
       }
-     
+      const data = await response.json();
 
-    const data = await response.json();
-
-      // Enhance assignment data with status
       const enhancedAssignments = data.map((assignment: any) => {
         const submittedByArray = assignment.submittedBy || [];
 
@@ -110,20 +139,19 @@ const [allSubjects, setSubjects] =useState<Subject[]>([]);
     } catch (error: any) {
       console.error("Error fetching assignments:", error);
     } finally {
-      setLoadingAssignments(false);
+      setIsLoadingAssignments(false);
+       setIsLoadingAssignments(true);
     }
   };
-const fetchSubjects= async () => {
-     const storedUser = localStorage.getItem("user");
+  const fetchSubjects = async () => {
+    const storedUser = localStorage.getItem("user");
     const parsedUser = storedUser ? JSON.parse(storedUser) : null;
     const uid = parsedUser?.uid || null;
     const courseId = parsedUser?.courseId || null;
 
-    // setUid(uidFromStorage);
-    // setCourseId(courseIdFromStorage);
-    setLoadingAssignments(true);
+    setIsLoadingAssignments(true);
+    setIsLoadingSubjects(true);
     try {
-    
 
       const response = await fetch(`/api/subjects/viewSubject/viewStudentSubjects?studentId=${uid}`);
 
@@ -132,44 +160,27 @@ const fetchSubjects= async () => {
       }
 
       const data = await response.json();
-console.log(data)
- setSubjects(data.simplifiedSubjects);
-      // Enhance assignment data with status
-      // const enhancedAssignments = data.map((assignment: any) => {
-      //   const submittedByArray = assignment.submittedBy || [];
-
-      //   const isSubmitted = submittedByArray.some(
-      //     (entry: any) => entry.userId === uid
-      //   );
-
-      //   return {
-      //     ...assignment,
-      //     status: isSubmitted ? "Submitted" : "Pending",
-      //   };
-      // });
-
-      // setAssignments(enhancedAssignments);
-      // console.log(enhancedAssignments);
+      console.log(data)
+      setSubjects(data.simplifiedSubjects);
+     
     } catch (error: any) {
       console.error("Error fetching assignments:", error);
     } finally {
-      setLoadingAssignments(false);
+      setIsLoadingAssignments(false);
+      setIsLoadingSubjects(false); // Set loading to false
+
     }
   };
 
   useEffect(() => {
-      // if (!uid || !courseId) return;
+    if (!user) return;
     fetchAssignments();
-  }, []);
+  }, [user]);
   useEffect(() => {
-      // if (!uid || !courseId) return;
+    if (!user) return;
     fetchSubjects();
-  }, []);
+  }, [user]);
 
-  // const subjects = [
-  //   "All",
-  //   ...Array.from(new Set(assignments.map((a) => a.subject))),
-  // ];
   const statuses = ["All", "Pending", "Submitted"];
 
   const filteredAndSortedAssignments = assignments
@@ -179,9 +190,11 @@ console.log(data)
       const fieldA = a[sortField as keyof typeof a];
       const fieldB = b[sortField as keyof typeof b];
       if (sortField === "dueDate") {
+        const dateA = fieldA ? new Date(fieldA as string).getTime() : 0;
+        const dateB = fieldB ? new Date(fieldB as string).getTime() : 0;
         return sortOrder === "asc"
-          ? new Date(fieldA).getTime() - new Date(fieldB).getTime()
-          : new Date(fieldB).getTime() - new Date(fieldA).getTime();
+          ? dateA - dateB
+          : dateB - dateA;
       }
       return sortOrder === "asc"
         ? String(fieldA).localeCompare(String(fieldB))
@@ -196,7 +209,17 @@ console.log(data)
   };
 
   const handleSubmit = async (assignmentId: number) => {
-    console.log(assignmentId);
+    const assignment = assignments.find(a => a.id === assignmentId);
+    console.log("assignment : ", assignment);
+    if (!assignment) {
+      setUploadError("Assignment not found.");
+      return;
+    }
+
+    const storedUser = localStorage.getItem("user");
+    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+    const uid = parsedUser?.uid || "unknown";
+
     if (!selectedFile) {
       setUploadError("Please select a file to upload.");
       return;
@@ -208,7 +231,13 @@ console.log(data)
 
     const formData = new FormData();
     formData.append("file", selectedFile);
-    formData.append("assignmentId", assignmentId.toString()); // You might want to send the assignment ID
+    formData.append("name", assignment?.title || "unknown")
+    formData.append("courseId", user?.courseId || "unknown");
+    formData.append("semesterId", assignment?.semesterId || "unknown");
+    formData.append("batchId", assignment?.batchId || "unknown");
+    formData.append("subjectId", assignment?.subjectId || "unknown");
+    formData.append("description", assignment?.description || "unknown");
+    formData.append("type", "assignment");
 
     try {
       const response = await fetch("/api/DocRepo/uploadAssignment", {
@@ -223,9 +252,6 @@ console.log(data)
         setSelectedFile(null);
         setSelectedAssignment(null);
         setUploadSuccess(true);
-        const storedUser = localStorage.getItem("user");
-        const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-        const uid = parsedUser?.uid || "unknown";
 
         try {
           const createAssignmentResponse = await fetch(
@@ -238,6 +264,7 @@ console.log(data)
               body: JSON.stringify({
                 assignmentId: assignmentId,
                 userId: uid,
+                resource_id: data.data.resource_id,
                 assignmentDocUrl: data.data.secure_url,
                 uploadedAt: new Date().toISOString(),
               }),
@@ -302,37 +329,46 @@ console.log(data)
               Assignments
             </CardTitle>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="flex items-center gap-2 border-border"
+             <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 border-border"
+                disabled={isLoadingSubjects} // Disable dropdown while subjects are loading
+              >
+                <Filter className="h-5 w-5" />
+                Subject: {filterSubject}
+                {isLoadingSubjects && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
+              {isLoadingSubjects ? (
+                <DropdownMenuItem className="flex items-center justify-center py-2">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Loading Subjects...
+                </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem
+                    key="all"
+                    onClick={() => setFilterSubject("All")}
+                    className="hover:bg-primary/10"
                   >
-                    <Filter className="h-5 w-5" />
-                    Subject: {filterSubject}
-                  </Button>
-                </DropdownMenuTrigger>
-               <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
-  <DropdownMenuItem
-    key="all"
-    onClick={() => setFilterSubject("All")}
-    className="hover:bg-primary/10"
-  >
-    All
-  </DropdownMenuItem>
-
-  {allSubjects.map((subject) => (
-    <DropdownMenuItem
-      key={subject.id}
-      onClick={() => setFilterSubject(subject.name)}
-      className="hover:bg-primary/10"
-    >
-      {subject.name}
-    </DropdownMenuItem>
-  ))}
-</DropdownMenuContent>
-
-              </DropdownMenu>
+                    All
+                  </DropdownMenuItem>
+                  {allSubjects.map((subject) => (
+                    <DropdownMenuItem
+                      key={subject.id}
+                      onClick={() => setFilterSubject(subject.name)}
+                      className="hover:bg-primary/10"
+                    >
+                      {subject.name}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -358,13 +394,14 @@ console.log(data)
             </div>
           </CardHeader>
           <ScrollArea className="flex-1 relative z-10 p-4">
-            {loadingAssignments ? (
-              <p className="text-muted-foreground text-center">
-                Loading assignments...
-              </p> // Simple loading indicator
-            ) : (
-              <Table>
-                <TableHeader>
+        {isLoadingAssignments ? ( // Conditional render for assignment loading
+          <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="mt-2 text-muted-foreground">Loading assignments...</p>
+          </div>
+        ) : (
+          <Table>
+             <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead>
                       <Button
@@ -391,9 +428,16 @@ console.log(data)
                     <TableHead className="text-foreground">Action</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {filteredAndSortedAssignments.map((assignment) => (
-                    <TableRow
+            <TableBody>
+              {filteredAndSortedAssignments.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    No assignments found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredAndSortedAssignments.map((assignment: Assignment) => (
+                  <TableRow
                       key={assignment.id}
                       className={cn(
                         "transition-all duration-300",
@@ -441,11 +485,12 @@ console.log(data)
                         )}
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </ScrollArea>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </ScrollArea>
         </Card>
 
         {/* Submission Form */}

@@ -7,17 +7,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, X, Trash2, Edit, File, ChevronUp, ChevronDown } from "lucide-react";
+import { FileText, Plus, X, Trash2, Edit, File, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { doc } from "firebase/firestore";
+
 
 interface Assignment {
   id: string;
   title: string;
-  course: string; // Changed to array of course IDs
+  courseId: string; // Changed to array of course IDs
   dueDate: string;
   assignmentDocUrl?: string | null;
   subjectId: string;
@@ -29,10 +29,11 @@ interface Assignment {
   createdat?: string;
   description?: string;
   semesterId?: string;
-  // If your backend sends a 'subject' object, you might need this:
-  // subject?: { subjectName: string; subjectId: string };
+  resource_id?: string;
   teacherId?: string;
   updatedAt?: string;
+  courseName?: string; // Optional, if you want to display course name
+  cloudinaryResourceType?: string;
 }
 
 interface Student {
@@ -44,10 +45,6 @@ interface Student {
   assignments?: number;
 }
 
-// interface Subject {
-//   name: string;
-//   students: Student[];
-// }
 
 interface Subjects {
   id: string;
@@ -66,67 +63,10 @@ interface Submission {
   assignmentDocUrl: string;
   grade?: number;
 }
-
 export default function FacultyAssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  // const [courses, setCourses] = useState<Course[]>([
-  //   {
-  //     name: "Mathematics 101",
-  //     subjects: [
-  //       {
-  //         name: "Algebra",
-  //         students: [
-  //           { id: 1, name: "John Doe", sessional1: undefined, sessional2: undefined, attendance: undefined, assignments: undefined },
-  //           { id: 2, name: "Jane Smith", sessional1: 8, sessional2: 9, attendance: 4, assignments: 3 },
-  //         ],
-  //       },
-  //       {
-  //         name: "Calculus",
-  //         students: [
-  //           { id: 1, name: "John Doe", sessional1: 7, sessional2: 8, attendance: 5, assignments: 4 },
-  //           { id: 2, name: "Jane Smith", sessional1: 9, sessional2: 7, attendance: 3, assignments: 5 },
-  //         ],
-  //       },
-  //     ],
-  //   },
-  //   {
-  //     name: "Physics 201",
-  //     subjects: [
-  //       {
-  //         name: "Mechanics",
-  //         students: [
-  //           { id: 3, name: "Alice Brown", sessional1: 7, sessional2: 6, attendance: 5, assignments: 4 },
-  //         ],
-  //       },
-  //       {
-  //         name: "Thermodynamics",
-  //         students: [
-  //           { id: 3, name: "Alice Brown", sessional1: 8, sessional2: 8, attendance: 4, assignments: 3 },
-  //         ],
-  //       },
-  //     ],
-  //   },
-  //   {
-  //     name: "CS 301",
-  //     subjects: [
-  //       {
-  //         name: "Algorithms",
-  //         students: [
-  //           { id: 4, name: "Bob Johnson", sessional1: 9, sessional2: 8, attendance: 3, assignments: 5 },
-  //         ],
-  //       },
-  //       {
-  //         name: "Data Structures",
-  //         students: [
-  //           { id: 4, name: "Bob Johnson", sessional1: 6, sessional2: 7, attendance: 4, assignments: 4 },
-  //         ],
-  //       },
-  //     ],
-  //   },
-  // ]);
 
   const [courses, setCourses] = useState<Course[]>([]);
-
   const [submissions, setSubmissions] = useState<{ [key: string]: Submission[] }>({
     "1": [
       { userId: 1, userName: "John Doe", uploadedAt: "2025-04-09", assignmentDocUrl: "/docs/math-set-john.pdf", grade: undefined },
@@ -136,211 +76,428 @@ export default function FacultyAssignmentsPage() {
       { userId: 3, userName: "Alice Brown", uploadedAt: "2025-04-07", assignmentDocUrl: "/docs/physics-lab-alice.pdf", grade: 90 },
     ],
   });
-
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-
-  const [openCourse, setOpenCourse] = useState<string>(""); // Added state for openCourse
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [editAssignment, setEditAssignment] = useState<Assignment | null>(null);
-  const [newAssignment, setNewAssignment] = useState({ title: "", course: "", dueDate: "", document: null as File | null });
-
-  const [uid, setUid] = useState<string | null>(null);
-
+  const [newAssignment, setNewAssignment] = useState({ title: "", subject: "", course: "", dueDate: "", document: null as File | null });
+  const [user, setUser] = useState<{
+    id: string;
+    name: string;
+    role: string;
+  } | null>(null);
+  const [subjectData, setSubjectData] = useState<
+    {
+      courseId: string;
+      courseName: string;
+      batchId: string;
+      batchName: string;
+      subjectId: string;
+      subjectName: string;
+    }[]
+  >([]);
+  const [openCourses, setOpenCourses] = useState<Record<string, boolean>>(
+    Object.fromEntries(courses.map((course) => [course.name, false]))
+  );
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
-    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-    const uidFromStorage = parsedUser?.uid || null;
-    setUid(uidFromStorage);
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        console.log("Parsed user from localStorage:", parsed);
+        setUser({
+          id: parsed.uid,
+          name: parsed.name,
+          role: parsed.role,
+        });
+      } catch (err) {
+        console.error("Error parsing user from localStorage:", err);
+      }
+    }
   }, []);
   const fetchAssignments = async () => {
+    setIsLoadingAssignments(true);
     try {
-
       const response = await fetch(`/api/assignment/viewAssignment`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch assignments: ${response.status}`);
       }
-
       const data = await response.json();
 
-      // Enhance assignment data with status
-
-      const enhancedAssignments = data.map((assignment: Assignment) => ({
-        ...assignment,
-        totalStudents: 120,
-        submissions: assignment.submittedBy?.length || 0,
-      }));
+      // Enhance assignment data with status and names
+      const enhancedAssignments = data.map((assignment: Assignment) => {
+        const { courseName, subjectName } = getCourseAndSubjectNames(
+          assignment.courseId,
+          assignment.batchId ?? "", // Ensure batchId is a string
+          assignment.subjectId
+        );
+        console.log(courseName, subjectName, assignment)
+        return {
+          ...assignment,
+          courseName: courseName,   // Add course name
+          subjectName: subjectName, // Add subject name
+          totalStudents: 120, // This seems to be a placeholder, adjust as needed
+          submissions: assignment.submittedBy?.length || 0,
+        };
+      });
 
       setAssignments(enhancedAssignments);
       console.log(enhancedAssignments);
     } catch (error: any) {
       console.error("Error fetching assignments:", error);
     }
-  };
-
-  const fetchCourseWiseSubjects = async () => {
-    try {
-
-      const response = await fetch(`/api/subjects/viewSubject/viewCourseWiseSubjects?teacherId=CsZ00htYppoqATY6uxAQ`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch assignments: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log(data)
-      // Map data to Course[] structure
-      const courseMap: Record<string, Course> = {};
-
-      data.forEach((item: any) => {
-        if (!courseMap[item.courseId]) {
-          courseMap[item.courseId] = {
-            id: item.courseId,
-            name: item.courseName,
-            subjects: [],
-          };
-        }
-
-        // Avoid duplicate subjects
-        const subjectExists = courseMap[item.courseId].subjects.some(
-          (s) => s.id === item.subjectId
-        );
-
-        if (!subjectExists) {
-          courseMap[item.courseId].subjects.push({
-            id: item.subjectId,
-            name: item.subjectName,
-          });
-        }
-      });
-
-      const courseList = Object.values(courseMap);
-      setCourses(courseList);
-      console.log("Transformed course list:", courseList);
-    } catch (error: any) {
-      console.error("Error fetching assignments:", error);
+    finally {
+      setIsLoadingAssignments(false); 
     }
   };
-
-  // Fetch assignments on component mount
   useEffect(() => {
-    fetchAssignments();
-  }, []);
+    if (user && subjectData && subjectData.length > 0) {
+      fetchAssignments();
+    } else if (user && (!subjectData || subjectData.length === 0)) {
+      fetchAssignments(); // Clear resources if data is not ready yet
+    }
+  }, [user, subjectData]);
+
+  const fetchSubjects = async () => {
+    setIsLoadingSubjects(true);
+    try {
+      console.log(user);
+      const response = await fetch(
+        `/api/subjects/viewSubject/viewCourseWiseSubjects?teacherId=${user?.id}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch subjects");
+      }
+      const data = await response.json();
+      setSubjectData(data);
+      console.log(data);
+    } catch (error) {
+      console.error("Error fetching subjects:", error);
+    } finally {
+      setIsLoadingSubjects(false); // Set loading to false after fetching subjects
+    }
+  };
   useEffect(() => {
-    fetchCourseWiseSubjects();
-  }, []);
+    if (!user) return;
+    fetchSubjects();
+  }, [user]);
+  const groupedCourses = subjectData?.reduce(
+    (
+      acc: {
+        name: string;
+        courseId: string;
+        batchId: string;
+        subjects: { id: string; name: string }[];
+      }[],
+      item
+    ) => {
+      const combinedName = `${item.courseName} - ${item.batchName}`;
+      const key = `${item.courseId}-${item.batchId}`; // Unique key for course+batch
 
-  const filteredAssignments = selectedCourse
-    ? assignments.filter((a) => a.course === selectedCourse)
-    : assignments;
+      const existing = acc.find(
+        (entry) =>
+          entry.courseId === item.courseId && entry.batchId === item.batchId
+      );
 
-  // useEffect(() => {
-  //   fetchCourses();
-  // }, []);
+      const subject = {
+        id: item.subjectId,
+        name: item.subjectName,
+      };
 
-  const handleAddOrUpdateAssignment = async () => {
-    if (newAssignment.title && newAssignment.course && newAssignment.dueDate) {
-      if (editAssignment) {
-        // Updating an existing assignment (not sending to API in this example)
-        setAssignments((prev) =>
-          prev.map((a) =>
-            a.id === editAssignment.id
-              ? {
-                ...a,
-                title: newAssignment.title,
-                course: newAssignment.course,
-                dueDate: newAssignment.dueDate,
-                document: newAssignment.document,
-              }
-              : a
-          )
+      if (existing) {
+        const alreadyExists = existing.subjects.some(
+          (s) => s.id === subject.id
         );
-        console.log("Updated assignment:", newAssignment);
+        if (!alreadyExists) {
+          existing.subjects.push(subject);
+        }
       } else {
-        try {
-          const formData = new FormData();
-          formData.append("title", newAssignment.title);
-          formData.append("course", newAssignment.course);
-          formData.append("dueDate", newAssignment.dueDate);
-          if (newAssignment.document) {
-            formData.append("file", newAssignment.document);
-          }
+        acc.push({
+          name: combinedName,
+          courseId: item.courseId,
+          batchId: item.batchId,
+          subjects: [subject],
+        });
+      }
 
-          const response = await fetch("/api/DocRepo/uploadAssignment", {
-            method: "POST",
-            body: formData,
-          });
+      return acc;
+    },
+    []
+  );
+  console.log(groupedCourses)
+  const handleToggleCourse = (name: string, open: boolean) => {
+    setOpenCourses((prev) => ({ ...prev, [name]: open }));
+  };
 
-          if (!response.ok) {
-            throw new Error("Failed to upload assignment");
-          }
-          const cloudiData = await response.json();
-          console.log(cloudiData)
+  const filteredAssignments = assignments.filter((assignment) => {
+    // If a course is selected AND a subject is selected within that course
+    if (selectedCourse && selectedSubject) {
+      const courseBatchInfo = groupedCourses.find(
+        (gc) => gc.name === selectedCourse
+      );
+
+      const subjectInfo = courseBatchInfo?.subjects.find(
+        (s) => s.name === selectedSubject
+      );
+
+      return (
+        assignment.courseId === courseBatchInfo?.courseId &&
+        assignment.batchId === courseBatchInfo?.batchId && // Assuming batchId is also part of the filter
+        assignment.subjectId === subjectInfo?.id
+      );
+    }
+ 
+    else if (selectedCourse) {
+      const courseBatchInfo = groupedCourses.find(
+        (gc) => gc.name === selectedCourse
+      );
+      // Filter by courseId and batchId
+      return (
+        assignment.courseId === courseBatchInfo?.courseId &&
+        assignment.batchId === courseBatchInfo?.batchId
+      );
+    }
+    // If neither a course nor a subject is selected, show all assignments
+    return true;
+  });
+
+  const getCourseInfoFromSubjectAndCourse = (subjectName: string, courseName: string) => {
+    if (!groupedCourses || groupedCourses.length === 0) {
+      console.warn("groupedCourses is not initialized or empty when calling getCourseInfoFromSubjectAndCourse.");
+      return null;
+    }
+
+    const match = groupedCourses.find((course) => course.name === courseName);
+    if (!match) {
+      console.error(`Course not found in groupedCourses for name: ${courseName}`);
+      return null;
+    }
+
+    const subject = match.subjects.find((s) => s.name === subjectName);
+    if (!subject) {
+      console.error(`Subject "${subjectName}" not found within course "${courseName}".`);
+      return null;
+    }
+
+    return {
+      courseId: match.courseId,
+      batchId: match.batchId,
+      subjectId: subject.id,
+    };
+  };
+  const getCourseAndSubjectNames = (
+    courseId: string,
+    batchId: string,
+    subjectId: string | undefined
+  ) => {
+    // Add a check to ensure groupedCourses is populated
+    if (!groupedCourses || groupedCourses.length === 0) {
+      // Provide a temporary loading state or default if data isn't ready
+      return { courseName: "Loading...", subjectName: "Loading..." };
+    }
+
+    const courseBatch = groupedCourses.find(
+      (gc) => gc.courseId === courseId && gc.batchId === batchId
+    );
+
+    const courseName = courseBatch ? courseBatch.name : "Unknown Course/Batch"; // More specific
+    const subjectName = subjectId
+      ? courseBatch?.subjects.find((s) => s.id === subjectId)?.name || "Unknown Subject"
+      : "No Subject Specified"; // More specific
+
+    return { courseName, subjectName };
+  };
+  const handleAddOrUpdateAssignment = async () => {
+    if (newAssignment.title && newAssignment.course && newAssignment.dueDate && newAssignment.document && newAssignment.subject) {
+      try {
+        setIsUploading(true);
+
+        const courseInfo = getCourseInfoFromSubjectAndCourse(newAssignment.subject, newAssignment.course);
+        if (!courseInfo) {
+          console.error("Subject or course not found in groupedCourses");
+          return;
+        }
+        const semesterResponse = await fetch(
+          `/api/semesterDetail/getSemesterDetails?courseId=${courseInfo.courseId}&batchId=${courseInfo.batchId}`
+        );
+        if (!semesterResponse.ok) {
+          // Handle cases where semester details are not found or API errors
+          const errorData = await semesterResponse.json();
+          console.error("Failed to fetch semester details:", errorData.error);
+          throw new Error(errorData.error || "Failed to fetch semester details");
+        }
+        const semesterData = await semesterResponse.json();
+        const semesterId = semesterData.semesterId;
+
+        if (editAssignment && editAssignment.resource_id && editAssignment.id) {
+          console.log(editAssignment)
+          console.log(newAssignment)
           try {
-            const createAssignmentResponse = await fetch("/api/assignment/createAssignment", {
+
+            const formData = new FormData();
+            formData.append("file", newAssignment.document);
+            formData.append("name", newAssignment.title);
+            formData.append("courseId", courseInfo.courseId || "");
+            formData.append("semesterId", semesterId);
+            formData.append("batchId", courseInfo.batchId);
+            formData.append("subjectId", courseInfo.subjectId);
+            formData.append("description", "Sample Assignment");
+            formData.append("resource_id", editAssignment.resource_id);
+            formData.append("id", editAssignment.id);
+            formData.append("cloudinaryResourceType", editAssignment.cloudinaryResourceType ?? "");
+
+            const response = await fetch("/api/DocRepo/updateResource/", {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                title: newAssignment.title,
-                description: "Sample Assignment",
-                courseId: "g8XqpmNeBFcD0ef8vn9V",
-                batchId: "batch_2025spring",
-                semesterId: "2TEj1rRwbjuluB1jGMQx",
-                subjectId: "b2YEKfSN0nvtG1DJEDuY",
-                teacherId: uid,
-                dueDate: newAssignment.dueDate,
-                assignmentDocUrl: cloudiData.data.secure_url
-              }),
+              body: formData, // or JSON.stringify(newAssignment)
             });
-
-            if (createAssignmentResponse.ok) {
-              console.log("assignment uploaded.")
-              fetchAssignments()
-
-
-
-            } else {
-              console.log("error fetching data")
+            const cloudiData = await response.json();
+            console.log("Cloudinary response:", cloudiData);
+            if (response.ok) {
+              console.log('sent')
+              const updateAssignmentResponse = await fetch("/api/assignment/updateAssignment", {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  id: editAssignment.id,
+                  title: newAssignment.title,
+                  description: "Sample Assignment",
+                  courseId: courseInfo.courseId,
+                  batchId: courseInfo.batchId,
+                  semesterId: semesterId,
+                  subjectId: courseInfo.subjectId,
+                  dueDate: newAssignment.dueDate,
+                  assignmentDocUrl: cloudiData.data.secure_url,
+                  resource_id: cloudiData.data.resource_id,
+                }),
+              });
+              console.log(await updateAssignmentResponse.json())
             }
           } catch (error: any) {
             console.log(error)
           }
-          const newId = assignments.length + 1;
-
-
-          console.log("Added assignment:", newAssignment);
-        } catch (error: any) {
-          console.error("Error uploading assignment:", error);
+          // Updating an existing assignment (not sending to API in this example)
+          await fetchAssignments();
+          setNewAssignment({ title: "", subject: "", course: "", dueDate: "", document: null });
+          console.log("Updated assignment:", newAssignment);
         }
+        else {
+          try {
+
+            const formData = new FormData();
+            formData.append("file", newAssignment.document);
+            formData.append("name", newAssignment.title);
+            formData.append("courseId", courseInfo.courseId || "");
+            formData.append("semesterId", semesterId);
+            formData.append("batchId", courseInfo.batchId || "");
+            formData.append("subjectId", courseInfo.subjectId || "");
+            formData.append("description", "Sample Assignment");
+            formData.append("type", "assignment");
+
+
+            const response = await fetch("/api/DocRepo/uploadAssignment", {
+              method: "POST",
+              body: formData,
+            });
+
+            if (!response.ok) {
+              throw new Error("Failed to upload assignment");
+            }
+            const cloudiData = await response.json();
+            console.log(cloudiData)
+            try {
+              const createAssignmentResponse = await fetch("/api/assignment/createAssignment", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  title: newAssignment.title,
+                  description: "Sample Assignment",
+                  courseId: courseInfo.courseId,
+                  batchId: courseInfo.batchId,
+                  semesterId: semesterId,
+                  subjectId: courseInfo.subjectId,
+                  teacherId: user?.id,
+                  dueDate: newAssignment.dueDate,
+                  assignmentDocUrl: cloudiData.data.secure_url,
+                  resource_id: cloudiData.data.resource_id
+                }),
+              });
+
+              if (createAssignmentResponse.ok) {
+                console.log("assignment uploaded.")
+                fetchAssignments()
+              } else {
+                console.log("error fetching data")
+              }
+            } catch (error: any) {
+              console.log(error)
+            }
+
+
+            console.log("Added assignment:", newAssignment);
+          } catch (error: any) {
+            console.error("Error uploading assignment:", error);
+          }
+        }
+      } catch (err: any) {
+
+      } finally {
+        setNewAssignment({ title: "", subject: "", course: "", dueDate: "", document: null });
+        setEditAssignment(null);
+        setShowAddForm(false);
+        setIsUploading(false);
       }
 
-      // Reset form and close dialog
-      setNewAssignment({ title: "", course: "", dueDate: "", document: null });
-      setEditAssignment(null);
-      setShowAddForm(false);
+    }
+  };
+  const handleRemoveAssignment = async (assignment: Assignment) => {
+    try {
+      setIsDeleting(assignment.id);
+      const response = await fetch("/api/assignment/deleteAssignment/", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: assignment.id, // any frontend request ID (if needed)
+          resource_id: assignment.resource_id, // this is the actual Firestore doc ID
+          cloudinaryResourceType: assignment.cloudinaryResourceType,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error("Failed to delete assignment:", result.error);
+        return;
+      }
+      setAssignments((prev) => prev.filter((a) => a.id !== assignment.id));
+      if (selectedAssignment?.id === assignment.id) {
+        setSelectedAssignment(null);
+      }
+
+      console.log("Deleted successfully:", result.message);
+    } catch (err) {
+      console.error("Error deleting assignment:", err);
+    } finally {
+      setIsDeleting(null); 
     }
   };
 
 
-  const handleRemoveAssignment = (id: string) => {
-    setAssignments((prev) => prev.filter((a) => a.id !== id));
-    if (selectedAssignment && selectedAssignment.id === id) setSelectedAssignment(null);
-    console.log(`Removed assignment ID: ${id}`);
-  };
-
   const handleEditAssignment = (assignment: Assignment) => {
     setEditAssignment(assignment);
-    // setNewAssignment({
-    //   title: assignment.title,
-    //   course: assignment.course,
-    //   dueDate: assignment.dueDate,
-    //   document: assignment.assignmentDocUrl ?? null,
-    // });
-    // setShowAddForm(true);
+    console.log("Editing assignment:", assignment);
+    setShowAddForm(true);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -376,12 +533,6 @@ export default function FacultyAssignmentsPage() {
     console.log(`Graded ${studentId} for assignment ${assignmentId}: ${grade}`);
   };
 
-  function handleSubjectChange(courseName: string, subjectName: string) {
-    setSelectedCourse(courseName);
-    setSelectedSubject(subjectName);
-    console.log(`Selected Course: ${courseName}, Selected Subject: ${subjectName}`);
-  }
-
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
       {/* Header */}
@@ -393,7 +544,16 @@ export default function FacultyAssignmentsPage() {
             Assignments
           </CardTitle>
           <div className="flex items-center gap-2 p-2">
-            <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+            <Dialog
+              open={showAddForm}
+              onOpenChange={(open) => { // This 'open' parameter is true when opening, false when closing
+                setShowAddForm(open); // This keeps your dialog's visibility state synchronized
+                if (!open) { // This condition checks if the dialog is *being closed*
+                  setEditAssignment(null); // Set editAssignment to null when the form closes
+                  setNewAssignment({ title: "", subject: "", course: "", dueDate: "", document: null }); // Also clear the form fields
+                }
+              }}
+            >
               <DialogTrigger asChild>
                 <Button className="bg-primary/10 text-foreground hover:bg-primary/20 rounded-lg px-4 py-2 shadow-sm hover:shadow-md transition-all duration-300">
                   <Plus className="h-4 w-4 mr-2" />
@@ -416,6 +576,31 @@ export default function FacultyAssignmentsPage() {
                     />
                   </div>
                   <div>
+                    <Label htmlFor="subject" className="text-foreground">
+                      Subject
+                    </Label>
+                    <Select
+                      value={newAssignment.subject}
+                      onValueChange={(value) =>
+                        setNewAssignment((prev) => ({ ...prev, subject: value }))
+                      }
+                    >
+                      <SelectTrigger className="bg-muted/50 border-border rounded-md">
+                        <SelectValue placeholder="Select subject" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groupedCourses.map((course) =>
+                          course.subjects.map((subject) => (
+                            <SelectItem key={subject.id} value={subject.name}>
+                              {subject.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+
+                    </Select>
+                  </div>
+                  <div>
                     <Label htmlFor="course" className="text-foreground">Course</Label>
                     <Select
                       value={newAssignment.course}
@@ -425,7 +610,7 @@ export default function FacultyAssignmentsPage() {
                         <SelectValue placeholder="Select course" />
                       </SelectTrigger>
                       <SelectContent>
-                        {courses.map((course) => (
+                        {groupedCourses.map((course) => (
                           <SelectItem key={course.name} value={course.name}>{course.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -459,8 +644,16 @@ export default function FacultyAssignmentsPage() {
                   <Button
                     onClick={handleAddOrUpdateAssignment}
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
+                    disabled={!newAssignment.title ||
+                      !newAssignment.subject ||
+                      !newAssignment.course ||
+                      !newAssignment.dueDate ||
+                      !newAssignment.document ||
+                      isUploading} // Disable the button while uploading to prevent double clicks
                   >
-                    {editAssignment ? "Update Assignment" : "Create Assignment"}
+                    {isUploading
+                      ? "Uploading..."
+                      : (editAssignment ? "Update Assignment" : "Create Assignment")}
                   </Button>
                 </div>
               </DialogContent>
@@ -474,44 +667,74 @@ export default function FacultyAssignmentsPage() {
         {/* Sidebar */}
         <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl border-r border-border h-full overflow-y-auto">
           <CardContent className="p-4">
-            {courses.map((course) => (
-              <Collapsible
-                key={course.name}
-                open={openCourse === course.name}
-                onOpenChange={() => setOpenCourse(openCourse === course.name ? "" : course.name)}
-                className="mb-2"
-              >
-                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 text-foreground font-semibold text-lg hover:bg-primary/10 rounded-md transition-all duration-300">
-                  {course.name}
-                  {openCourse === course.name ? (
-                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                  )}
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                  {course.subjects.map((subject) => (
-                    <div
-                      key={subject.name}
-                      className={cn(
-                        "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
-                        selectedCourse === course.name && selectedSubject === subject.name &&
-                        "bg-primary/20 border-l-4 border-primary"
-                      )}
-                      onClick={() => {
-                        setSelectedCourse(course.name);
-                        setSelectedSubject(subject.name);
-                      }}
-                    >
-                      {subject.name}
-                    </div>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
+            <div
+              className={cn(
+                "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300 mb-2",
+                !selectedCourse &&
+                !selectedSubject &&
+                "bg-primary/20 border-l-4 border-primary"
+              )}
+              onClick={() => {
+                setSelectedCourse(null);
+                setSelectedSubject(null);
+              }}
+            >
+              All Courses
+            </div>
+            {isLoadingSubjects ? ( // Conditional render for subject loading
+              <div className="flex items-center justify-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Loading Courses and Subjects...</span>
+              </div>
+            ) : groupedCourses.length === 0 ? (
+              <div className="p-4 text-muted-foreground text-center">No subjects found.</div>
+            ) : (
+              groupedCourses.map((course) => (
+                <Collapsible
+                  key={course.name}
+                  open={openCourses[course.name]}
+                  onOpenChange={(open) => handleToggleCourse(course.name, open)}
+                  className="mb-2"
+                >
+                  <CollapsibleTrigger
+                    className={cn(
+                      "flex items-center justify-between w-full p-2 text-foreground rounded-md hover:bg-primary/10 transition-all duration-300",
+                      selectedCourse === course.name &&
+                      !selectedSubject &&
+                      "bg-primary/20 border-l-4 border-primary"
+                    )}
+                  >
+                    <span>{course.name}</span>
+                    {openCourses[course.name] ? (
+                      <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="transition-all duration-300">
+                    {course.subjects.map((subject) => (
+                      <div
+                        key={subject.name}
+                        className={cn(
+                          "p-2 pl-6 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
+                          selectedCourse === course.name &&
+                          selectedSubject === subject.name &&
+                          "bg-primary/20 border-l-4 border-primary"
+                        )}
+                        onClick={() => {
+                          setSelectedCourse(course.name);
+                          setSelectedSubject(subject.name);
+                        }}
+                      >
+                        {subject.name}
+                      </div>
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
+              ))
+            )}
           </CardContent>
         </Card>
-
         {/* Assignments/Submissions */}
         <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden h-full min-h-0">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
@@ -524,62 +747,90 @@ export default function FacultyAssignmentsPage() {
                       <TableHead className="text-foreground">Title</TableHead>
                       <TableHead className="text-foreground">Due Date</TableHead>
                       <TableHead className="text-foreground">Submissions</TableHead>
+
                       <TableHead className="text-foreground">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAssignments.map((assignment) => (
-                      <TableRow
-                        key={assignment.id}
-                        className="hover:bg-primary/5 transition-all duration-300"
-                      >
-                        <TableCell className="font-medium text-foreground">{assignment.title}</TableCell>
-                        <TableCell className="text-muted-foreground">{assignment.dueDate}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {assignment.submissions}/{assignment.totalStudents}
-                        </TableCell>
-                        <TableCell className="flex justify-between gap-4">
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleGrade(assignment)}
-                              className="border-border text-foreground hover:bg-primary/10"
-                            >
-                              View Submissions
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewDocument(assignment.assignmentDocUrl ?? null)}
-                              className="border-border text-foreground hover:bg-primary/10"
-                              disabled={!assignment.assignmentDocUrl}
-                            >
-                              <File className="h-4 w-4 mr-2" />
-                              View Assignment
-                            </Button>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditAssignment(assignment)}
-                              className="text-foreground hover:bg-primary/10"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveAssignment(assignment.id)}
-                              className="text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                    {isLoadingAssignments ? ( // Conditional render for assignment loading
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          <div className="flex items-center justify-center p-4">
+                            <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                            <span>Loading Assignments...</span>
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : filteredAssignments.length > 0 ? (
+                      filteredAssignments.map((assignment) => (
+                        <TableRow
+                          key={assignment.id}
+                          className="hover:bg-primary/5 transition-all duration-300"
+                        >
+                          <TableCell className="font-medium text-foreground">{assignment.title}</TableCell>
+                          <TableCell className="text-muted-foreground">{assignment.dueDate}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {assignment.submissions}/{assignment.totalStudents}
+                          </TableCell>
+
+                          <TableCell className="flex justify-between gap-4 ">
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleGrade(assignment)}
+                                className="border-border text-foreground hover:bg-primary/10"
+                              >
+                                View Submissions
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewDocument(assignment.assignmentDocUrl ?? null)}
+                                className="border-border text-foreground hover:bg-primary/10"
+                                disabled={!assignment.assignmentDocUrl}
+                              >
+                                <File className="h-4 w-4 mr-2" />
+                                View Assignment
+                              </Button>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditAssignment(assignment)}
+                                className="text-foreground hover:bg-primary/10"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveAssignment(assignment)}
+                                className="text-destructive hover:bg-destructive/10"
+
+                                disabled={isDeleting === assignment.id} // Disable if this assignment is being deleted
+                              >
+                                {isDeleting === assignment.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5} // Adjusted colSpan to 5 for consistency with TableHead
+                          className="text-center text-muted-foreground"
+                        >
+                          No assignments available.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </ScrollArea>

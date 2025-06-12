@@ -23,77 +23,102 @@ export async function GET(req: NextRequest) {
 
 
 
-   if (token.role === "faculty") {
-  const uid = token.id;
+    if (token.role === "faculty") {
+      const uid = token.id;
 
-  // Step 1: Get all assignments by this faculty
-  const snapshot = await admin
-    .firestore()
-    .collection("assignments")
-    .where("teacherId", "==", uid)
-    .get();
+      // Step 1: Get all assignments by this faculty
+      const snapshot = await admin
+        .firestore()
+        .collection("assignments")
+        .where("teacherId", "==", uid)
+        .get();
 
-  const rawAssignments = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data()
-  }));
+      const rawAssignments = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+ const resourceIds = new Set<string>();
+      rawAssignments.forEach((assignment: any) => {
+        if (assignment.resource_id) { // Assuming resource_id is the field that links to the resource collection
+          resourceIds.add(assignment.resource_id);
+        }
+      });
 
-  // Step 2: Collect all unique student userIds from submittedBy arrays
-  const userIdSet = new Set<string>();
-  rawAssignments.forEach((assignment: any) => {
-    (assignment.submittedBy || []).forEach((entry: any) => {
-      if (entry.userId) userIdSet.add(entry.userId);
-    });
-  });
+      const cloudinaryResourceMap: Record<string, string> = {}; // Maps resource_id to cloudinaryResourceType
+      if (resourceIds.size > 0) {
+        // Fetch resources in batches if there are many to avoid query limits
+        const resourceFetches = Array.from(resourceIds).map(async (resId) => {
+          const resourceDoc = await admin.firestore().collection("resources").doc(resId).get();
+          if (resourceDoc.exists) {
+            const resourceData = resourceDoc.data();
+            // Assuming the field in your 'resources' collection is named 'cloudinaryResourceType'
+            if (resourceData?.cloudinaryResourceType) {
+              cloudinaryResourceMap[resId] = resourceData.cloudinaryResourceType;
+            }
+          }
+        });
+        await Promise.all(resourceFetches);
+      }
+      // Step 2: Collect all unique student userIds from submittedBy arrays
+      const userIdSet = new Set<string>();
+      rawAssignments.forEach((assignment: any) => {
+        (assignment.submittedBy || []).forEach((entry: any) => {
+          if (entry.userId) userIdSet.add(entry.userId);
+        });
+      });
 
-  // Step 3: Fetch user names for these userIds from the "users" collection
-  const userMap: Record<string, string> = {};
-  const userFetches = Array.from(userIdSet).map(async (userId) => {
-    const userDoc = await admin.firestore().collection("users").doc(userId).get();
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      userMap[userId] = userData?.name || "Unknown";
+      // Step 3: Fetch user names for these userIds from the "users" collection
+      const userMap: Record<string, string> = {};
+      const userFetches = Array.from(userIdSet).map(async (userId) => {
+        const userDoc = await admin.firestore().collection("users").doc(userId).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          userMap[userId] = userData?.name || "Unknown";
+        }
+      });
+      await Promise.all(userFetches);
+
+      // Step 4: Add userName to each submittedBy entry
+      const enrichedAssignments = rawAssignments.map((assignment: any) => ({
+        id: assignment.id,
+        assignmentDocUrl: assignment.assignmentDocUrl,
+        batchId: assignment.batchId,
+        courseId: assignment.courseId,
+        createdAt: assignment.createdAt,
+        description: assignment.description,
+        dueDate: assignment.dueDate,
+        semesterId: assignment.semesterId,
+        subjectId: assignment.subjectId,
+        submittedBy: (assignment.submittedBy || []).map((entry: any) => ({
+          ...entry,
+          userName: userMap[entry.userId] || "Unknown",
+        })),
+        teacherId: assignment.teacherId,
+        title: assignment.title,
+        updatedAt: assignment.updatedAt,
+        resource_id: assignment.resource_id,
+         cloudinaryResourceType: assignment.resource_id
+          ? cloudinaryResourceMap[assignment.resource_id] || "raw" // Default to 'raw' if not found or if resource_id is missing/invalid
+          : "raw",
+      }));
+
+      // Step 5: Add subject names
+      const subjectsSnapshot = await admin.firestore().collection("subjects").get();
+      const subjects: Record<string, any> = {};
+      subjectsSnapshot.docs.forEach((doc) => {
+        subjects[doc.id] = doc.data();
+      });
+
+      const assignmentsWithSubjects = enrichedAssignments.map((assignment) => {
+        const subjectDetails = subjects[assignment.subjectId] || { name: "Unknown Subject" };
+        return {
+          ...assignment,
+          subject: subjectDetails.name,
+        };
+      });
+
+      return NextResponse.json(assignmentsWithSubjects, { status: 200 });
     }
-  });
-  await Promise.all(userFetches);
-
-  // Step 4: Add userName to each submittedBy entry
-  const enrichedAssignments = rawAssignments.map((assignment: any) => ({
-    id: assignment.id,
-    assignmentDocUrl: assignment.assignmentDocUrl,
-    batchId: assignment.batchId,
-    courseId: assignment.courseId,
-    createdAt: assignment.createdAt,
-    description: assignment.description,
-    dueDate: assignment.dueDate,
-    semesterId: assignment.semesterId,
-    subjectId: assignment.subjectId,
-    submittedBy: (assignment.submittedBy || []).map((entry: any) => ({
-      ...entry,
-      userName: userMap[entry.userId] || "Unknown",
-    })),
-    teacherId: assignment.teacherId,
-    title: assignment.title,
-    updatedAt: assignment.updatedAt,
-  }));
-
-  // Step 5: Add subject names
-  const subjectsSnapshot = await admin.firestore().collection("subjects").get();
-  const subjects: Record<string, any> = {};
-  subjectsSnapshot.docs.forEach((doc) => {
-    subjects[doc.id] = doc.data();
-  });
-
-  const assignmentsWithSubjects = enrichedAssignments.map((assignment) => {
-    const subjectDetails = subjects[assignment.subjectId] || { name: "Unknown Subject" };
-    return {
-      ...assignment,
-      subject: subjectDetails.name,
-    };
-  });
-
-  return NextResponse.json(assignmentsWithSubjects, { status: 200 });
-}
 
     else if (token.role === "student") {
       console.log(token)

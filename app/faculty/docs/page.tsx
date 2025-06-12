@@ -18,6 +18,7 @@ import {
   Download,
   ChevronUp,
   ChevronDown,
+  Loader2
 } from "lucide-react";
 import { use, useEffect, useState } from "react";
 import {
@@ -51,7 +52,23 @@ interface Document {
   uploaded: string;
   subject: string;
 }
-
+interface Resource {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  courseId: string;
+  batchId: string;
+  subjectId?: string;
+  semesterId: string;
+  createdBy: string;
+  fileUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  courseName?: string; // Optional, if you want to display course name
+  subjectName?: string; // Optional, if you want to display subject name
+  cloudinaryResourceType?: string; // Optional, if you want to display resource type
+}
 export default function FacultyDocRepoPage() {
   const [user, setUser] = useState<{
     id: string;
@@ -69,7 +86,9 @@ export default function FacultyDocRepoPage() {
       subjectName: string;
     }[]
   >([]);
-
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true); 
+  const [isLoadingResources, setIsLoadingResources] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -88,6 +107,7 @@ export default function FacultyDocRepoPage() {
   }, []);
 
   const fetchSubjects = async () => {
+    setIsLoadingSubjects(true)
     try {
       console.log(user);
       const response = await fetch(
@@ -101,30 +121,16 @@ export default function FacultyDocRepoPage() {
       console.log(data);
     } catch (error) {
       console.error("Error fetching subjects:", error);
+    } finally {
+      setIsLoadingSubjects(false); // Set loading to false after fetching
     }
   };
 
   useEffect(() => {
-    if (!user) return;
-    fetchSubjects();
+    if (user) { // Only fetch subjects if user is available
+      fetchSubjects();
+    }
   }, [user]);
-
-  const [documents, setDocuments] = useState<Document[]>([
-    {
-      id: 1,
-      name: "Math Lecture Notes",
-      file: "/docs/math-lecture.pdf",
-      uploaded: "2025-04-01",
-      subject: "Algebra",
-    },
-    {
-      id: 2,
-      name: "Physics Lab Guide",
-      file: "/docs/physics-lab.pdf",
-      uploaded: "2025-04-02",
-      subject: "Mechanics",
-    },
-  ]);
 
   const courses = [
     {
@@ -146,20 +152,14 @@ export default function FacultyDocRepoPage() {
   const [newDocument, setNewDocument] = useState({
     name: "",
     subject: "",
+    course: "",
     file: null as File | null,
   });
+  const [isUploading, setIsUploading] = useState(false);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [openCourses, setOpenCourses] = useState<Record<string, boolean>>(
     Object.fromEntries(courses.map((course) => [course.name, false]))
   );
-
-  const subjects = [
-    "Algebra",
-    "Calculus",
-    "Mechanics",
-    "Thermodynamics",
-    "Algorithms",
-    "Data Structures",
-  ];
 
   const groupedCourses = subjectData?.reduce(
     (
@@ -204,39 +204,205 @@ export default function FacultyDocRepoPage() {
     },
     []
   );
+  const getCourseInfoFromSubjectAndCourse = (subjectName: string, courseName: string) => {
+    if (!groupedCourses || groupedCourses.length === 0) {
+      console.warn("groupedCourses is not initialized or empty when calling getCourseInfoFromSubjectAndCourse.");
+      return null;
+    }
 
-  const filteredDocuments = selectedCourse
+    const match = groupedCourses.find((course) => course.name === courseName);
+    if (!match) {
+      console.error(`Course not found in groupedCourses for name: ${courseName}`);
+      return null;
+    }
+
+    const subject = match.subjects.find((s) => s.name === subjectName);
+    if (!subject) {
+      console.error(`Subject "${subjectName}" not found within course "${courseName}".`);
+      return null;
+    }
+
+    return {
+      courseId: match.courseId,
+      batchId: match.batchId,
+      subjectId: subject.id,
+    };
+  };
+  const getCourseAndSubjectNames = (
+    courseId: string,
+    batchId: string,
+    subjectId: string | undefined
+  ) => {
+    // Add a check to ensure groupedCourses is populated
+    if (!groupedCourses || groupedCourses.length === 0) {
+      // Provide a temporary loading state or default if data isn't ready
+      return { courseName: "Loading...", subjectName: "Loading..." };
+    }
+
+    const courseBatch = groupedCourses.find(
+      (gc) => gc.courseId === courseId && gc.batchId === batchId
+    );
+
+    const courseName = courseBatch ? courseBatch.name : "Unknown Course/Batch"; // More specific
+    const subjectName = subjectId
+      ? courseBatch?.subjects.find((s) => s.id === subjectId)?.name || "Unknown Subject"
+      : "No Subject Specified"; // More specific
+
+    return { courseName, subjectName };
+  };
+  const fetchResources = async () => {
+    setIsLoadingResources(true);
+    try {
+      const response = await fetch(`/api/DocRepo/viewResource?teacherId=${user?.id}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch resources: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(result)
+      const filtered = result.map((item: any) => {
+        // Use the helper function to get names based on IDs
+        const { courseName, subjectName } = getCourseAndSubjectNames(
+          item.courseId,
+          item.batchId,
+          item.subjectId
+        );
+
+        return {
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          description: item.description,
+          courseId: item.courseId,
+          batchId: item.batchId,
+          subjectId: item.subjectId,
+          semesterId: item.semesterId,
+          createdBy: item.createdBy,
+          fileUrl: item.fileUrl,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          courseName: courseName, // Assign the resolved course name
+          subjectName: subjectName, // Assign the resolved subject name
+          cloudinaryResourceType: item.cloudinaryResourceType, // Use the resource type if available
+        };
+      });
+
+      setResources(filtered);
+
+      console.log(filtered);
+    } catch (error: any) {
+      console.error("Error fetching assignments:", error);
+    } finally {
+      setIsLoadingResources(false); // Set loading to false after fetching
+    }
+  };
+  useEffect(() => {
+    if (user && subjectData && subjectData.length > 0) {
+      fetchResources();
+    } else if (user && (!subjectData || subjectData.length === 0)) {
+      setResources([]); // Clear resources if data is not ready yet
+    }
+  }, [user, subjectData]);
+
+  const filteredResources = selectedCourse
     ? selectedSubject
-      ? documents.filter((doc) => doc.subject === selectedSubject)
-      : documents.filter((doc) =>
-          courses
-            .find((c) => c.name === selectedCourse)!
-            .subjects.map((s) => s.name)
-            .includes(doc.subject)
-        )
+      ? resources.filter((resource) => resource.subjectName === selectedSubject && resource.courseName === selectedCourse)
+      : resources.filter((resource) => resource.courseName === selectedCourse)
     : selectedSubject
-    ? documents.filter((doc) => doc.subject === selectedSubject)
-    : documents;
+      ? resources.filter((resource) => resource.subjectName === selectedSubject)
+      : resources;
 
-  const handleUpload = () => {
-    if (newDocument.name && newDocument.subject && newDocument.file) {
-      const newDoc = {
-        id: documents.length + 1,
-        name: newDocument.name,
-        file: `/docs/${newDocument.file.name}`,
-        uploaded: new Date().toISOString().split("T")[0],
-        subject: newDocument.subject,
-      };
-      setDocuments([...documents, newDoc]);
-      console.log("Uploaded:", newDoc);
-      setNewDocument({ name: "", subject: "", file: null });
+
+
+  const handleUpload = async () => {
+    if (newDocument.name && newDocument.subject && newDocument.file && newDocument.course) {
+      const courseInfo = getCourseInfoFromSubjectAndCourse(newDocument.subject, newDocument.course);
+      console.log(courseInfo)
+      if (!courseInfo) {
+        console.error("Subject or course not found in groupedCourses");
+        return;
+      }
+
+      setIsUploading(true);
+      try {
+        const semesterResponse = await fetch(
+          `/api/semesterDetail/getSemesterDetails?courseId=${courseInfo.courseId}&batchId=${courseInfo.batchId}`
+        );
+        if (!semesterResponse.ok) {
+          // Handle cases where semester details are not found or API errors
+          const errorData = await semesterResponse.json();
+          console.error("Failed to fetch semester details:", errorData.error);
+          throw new Error(errorData.error || "Failed to fetch semester details");
+        }
+        const semesterData = await semesterResponse.json();
+        const semesterId = semesterData.semesterId;
+
+        const formData = new FormData();
+        formData.append("file", newDocument.file);
+        formData.append("name", newDocument.name)
+        formData.append("courseId", courseInfo.courseId || "");
+        formData.append("semesterId", semesterId || "");
+        formData.append("batchId", courseInfo.batchId || "");
+        formData.append("subjectId", courseInfo.subjectId || "");
+        formData.append("description", "Sample Assignment");
+        formData.append("type", "notes");
+
+
+        const response = await fetch("/api/DocRepo/uploadAssignment", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to upload assignment");
+        }
+        const result = await response.json();
+
+        await fetchResources();
+
+      } catch (error: any) {
+        console.log("error: ", error)
+      }
+      finally {
+        setIsUploading(false);
+      }
+
+      setNewDocument({ name: "", course: "", subject: "", file: null });
       setShowUploadForm(false);
     }
   };
 
-  const handleRemoveDocument = (id: number) => {
-    setDocuments((prev) => prev.filter((doc) => doc.id !== id));
-    console.log(`Removed document ID: ${id}`);
+  const handleRemoveDocument = async (doc: Resource) => {
+    try {
+       setDeletingId(doc.id);
+      console.log(doc)
+      const response = await fetch("/api/DocRepo/deleteResource/", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          resource_id: doc.id,
+          cloudinaryResourceType: doc.cloudinaryResourceType, // Use the resource type if available
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error("Failed to delete assignment:", result.error);
+        return;
+      }
+      setResources((prev) => prev.filter((r) => r.id !== doc.id));
+      console.log(`Removed resource ID: ${doc.id}`);
+
+    } catch (err: any) {
+      console.log(err)
+    }finally {
+        setDeletingId(null); // Reset after deletion attempt
+    }
+
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -306,10 +472,29 @@ export default function FacultyDocRepoPage() {
                         <SelectValue placeholder="Select subject" />
                       </SelectTrigger>
                       <SelectContent>
-                        {subjects.map((subject) => (
-                          <SelectItem key={subject} value={subject}>
-                            {subject}
-                          </SelectItem>
+                        {groupedCourses.map((course) =>
+                          course.subjects.map((subject) => (
+                            <SelectItem key={subject.id} value={subject.name}>
+                              {subject.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="course" className="text-foreground">Course</Label>
+                    <Select
+                      value={newDocument.course}
+                      onValueChange={(value) => setNewDocument((prev) => ({ ...prev, course: value }))}
+                    >
+                      <SelectTrigger className="bg-muted/50 border-border rounded-md">
+                        <SelectValue placeholder="Select course" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groupedCourses.map((course) => (
+                          <SelectItem key={course.name} value={course.name}>{course.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -337,10 +522,11 @@ export default function FacultyDocRepoPage() {
                     disabled={
                       !newDocument.name ||
                       !newDocument.subject ||
-                      !newDocument.file
+                      !newDocument.file ||
+                      isUploading // <--- Disable if isUploading is true
                     }
                   >
-                    Upload
+                    {isUploading ? "Uploading..." : "Upload"}
                   </Button>
                 </div>
               </DialogContent>
@@ -358,8 +544,8 @@ export default function FacultyDocRepoPage() {
               className={cn(
                 "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300 mb-2",
                 !selectedCourse &&
-                  !selectedSubject &&
-                  "bg-primary/20 border-l-4 border-primary"
+                !selectedSubject &&
+                "bg-primary/20 border-l-4 border-primary"
               )}
               onClick={() => {
                 setSelectedCourse(null);
@@ -368,49 +554,58 @@ export default function FacultyDocRepoPage() {
             >
               All Courses
             </div>
-            {groupedCourses.map((course) => (
-              <Collapsible
-                key={course.name}
-                open={openCourses[course.name]}
-                onOpenChange={(open) => handleToggleCourse(course.name, open)}
-                className="mb-2"
-              >
-                <CollapsibleTrigger
-                  className={cn(
-                    "flex items-center justify-between w-full p-2 text-foreground rounded-md hover:bg-primary/10 transition-all duration-300",
-                    selectedCourse === course.name &&
+            {isLoadingSubjects ? ( // Conditional render for subject loading
+              <div className="flex items-center justify-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Loading Courses and  Subjects...</span>
+              </div>
+            ) : groupedCourses.length === 0 ? (
+              <div className="p-4 text-muted-foreground text-center">No subjects found.</div>
+            ) : (
+              groupedCourses.map((course) => (
+                <Collapsible
+                  key={course.name}
+                  open={openCourses[course.name]}
+                  onOpenChange={(open) => handleToggleCourse(course.name, open)}
+                  className="mb-2"
+                >
+                  <CollapsibleTrigger
+                    className={cn(
+                      "flex items-center justify-between w-full p-2 text-foreground rounded-md hover:bg-primary/10 transition-all duration-300",
+                      selectedCourse === course.name &&
                       !selectedSubject &&
                       "bg-primary/20 border-l-4 border-primary"
-                  )}
-                >
-                  <span>{course.name}</span>
-                  {openCourses[course.name] ? (
-                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                  )}
-                </CollapsibleTrigger>
-                <CollapsibleContent className="transition-all duration-300">
-                  {course.subjects.map((subject) => (
-                    <div
-                      key={subject.name}
-                      className={cn(
-                        "p-2 pl-6 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
-                        selectedCourse === course.name &&
+                    )}
+                  >
+                    <span>{course.name}</span>
+                    {openCourses[course.name] ? (
+                      <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="transition-all duration-300">
+                    {course.subjects.map((subject) => (
+                      <div
+                        key={subject.name}
+                        className={cn(
+                          "p-2 pl-6 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
+                          selectedCourse === course.name &&
                           selectedSubject === subject.name &&
                           "bg-primary/20 border-l-4 border-primary"
-                      )}
-                      onClick={() => {
-                        setSelectedCourse(course.name);
-                        setSelectedSubject(subject.name);
-                      }}
-                    >
-                      {subject.name}
-                    </div>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
+                        )}
+                        onClick={() => {
+                          setSelectedCourse(course.name);
+                          setSelectedSubject(subject.name);
+                        }}
+                      >
+                        {subject.name}
+                      </div>
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -425,12 +620,22 @@ export default function FacultyDocRepoPage() {
                     <TableHead className="text-foreground">Name</TableHead>
                     <TableHead className="text-foreground">File Path</TableHead>
                     <TableHead className="text-foreground">Uploaded</TableHead>
+
                     <TableHead className="text-foreground">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredDocuments.length > 0 ? (
-                    filteredDocuments.map((doc) => (
+                  {isLoadingResources ? ( // Conditional render for resource loading
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        <div className="flex items-center justify-center p-4">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                          <span>Loading Documents...</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredResources.length > 0 ? (
+                    filteredResources.map((doc) => (
                       <TableRow
                         key={doc.id}
                         className="hover:bg-primary/5 transition-all duration-300"
@@ -439,30 +644,39 @@ export default function FacultyDocRepoPage() {
                           {doc.name}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {doc.file}
+                          <a href={`https://docs.google.com/viewer?url=${encodeURIComponent(doc.fileUrl)}`}
+                            target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                            View File
+                          </a>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {doc.uploaded}
+                          {doc.createdAt.slice(0, 10)}
                         </TableCell>
-                        <TableCell className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => console.log(`Download ${doc.file}`)}
-                            className="border-border text-foreground hover:bg-primary/10"
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveDocument(doc.id)}
-                            className="text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+
+                       <TableCell className="flex gap-2 ">
+    <Button
+        variant="outline"
+        size="sm"
+        className="border-border text-foreground hover:bg-primary/10"
+    >
+        <a href={doc.fileUrl} download>
+            <Download className="h-4 w-4 " />
+        </a>
+    </Button>
+    <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => handleRemoveDocument(doc)}
+        className="text-destructive hover:bg-destructive/10"
+        disabled={deletingId === doc.id} // Disable if this doc is being deleted
+    >
+        {deletingId === doc.id ? (
+            <Loader2 className="h-4 w-4 animate-spin" /> // Show loader
+        ) : (
+            <Trash2 className="h-4 w-4" /> // Show trash icon
+        )}
+    </Button>
+</TableCell>
                       </TableRow>
                     ))
                   ) : (

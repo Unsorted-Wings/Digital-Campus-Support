@@ -29,12 +29,16 @@ export async function DELETE(req: NextRequest) {
     // if (token.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     // Body
-    const {resource_id,cloudinaryResourceType } = await req.json();
-    if (!resource_id || !cloudinaryResourceType) return NextResponse.json({ error: "Missing resource ID" }, { status: 400 });
+    const { id,resource_id,cloudinaryResourceType } = await req.json();
+    if (!id || !resource_id|| !cloudinaryResourceType) return NextResponse.json({ error: "Missing resource ID" }, { status: 400 });
 
     const docRef = admin.firestore().collection("resources").doc(resource_id);
     const doc = await docRef.get();
     if (!doc.exists) return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+
+     const assignmentRef = admin.firestore().collection("assignments").doc(id);
+    const assignment = await assignmentRef.get();
+    if (!assignment.exists) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
 
     const data = doc.data();
     const assetId = data?.asset_id;
@@ -42,7 +46,7 @@ export async function DELETE(req: NextRequest) {
     // Delete from Cloudinary using asset_id
     if (assetId) {
       try {
-        await cloudinary.api.delete_resources([assetId], { resource_type: cloudinaryResourceType  });
+        await cloudinary.api.delete_resources([assetId], { resource_type: cloudinaryResourceType || "auto" });
       } catch (err: any) {
         console.warn("Cloudinary deletion failed:", err);
         // Optional: still proceed with Firestore deletion even if Cloudinary fails
@@ -51,8 +55,9 @@ export async function DELETE(req: NextRequest) {
 
     // Delete Firestore doc
     await docRef.delete();
+    await assignmentRef.delete();
 
-    return NextResponse.json({ message: "Resource deleted", resource_id }, { status: 200 });
+    return NextResponse.json({ message: "Resource deleted", id }, { status: 200 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

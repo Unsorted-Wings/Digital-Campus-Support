@@ -23,9 +23,9 @@ export async function PUT(req: NextRequest) {
 
     // Verify if the user has the "admin" role
     const { role } = token; // Assuming the role is included in the JWT token
-    if (role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // if (role !== "admin") {
+    //   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // }
 
     // Body processing
     const { id, ...updates } = await req.json();

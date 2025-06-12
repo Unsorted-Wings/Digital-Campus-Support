@@ -32,11 +32,12 @@ export async function POST(req: NextRequest) {
       const {
         userId,
         assignmentId, 
+        resource_id,
         assignmentDocUrl,
         uploadedAt
       } = await req.json();
      
-      if (!userId || !assignmentDocUrl || !uploadedAt || !assignmentId) {
+      if (!userId || !assignmentDocUrl || !uploadedAt || !assignmentId || !resource_id) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
       }
 
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
 
       const submission = {
         userId,
+        resource_id,
         assignmentDocUrl,
         uploadedAt
       };
@@ -65,10 +67,11 @@ export async function POST(req: NextRequest) {
         subjectId,
         teacherId,
         dueDate,
-        assignmentDocUrl
+        assignmentDocUrl,
+        resource_id
       } = await req.json();
 
-      if (!title || !description || !courseId || !batchId || !semesterId || !subjectId || !teacherId || !dueDate || !assignmentDocUrl) {
+      if (!title || !description || !courseId || !batchId || !semesterId || !subjectId || !teacherId || !dueDate || !assignmentDocUrl || !resource_id) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
       }
 
@@ -84,6 +87,7 @@ export async function POST(req: NextRequest) {
         teacherId,
         dueDate,
         assignmentDocUrl,
+        resource_id,
         submittedBy: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
