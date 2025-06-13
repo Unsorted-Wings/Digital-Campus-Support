@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
+const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
 interface Assignment {
   id: string;
@@ -65,6 +66,7 @@ interface Submission {
 }
 export default function FacultyAssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [submissions, setSubmissions] = useState<{ [key: string]: Submission[] }>({
@@ -500,10 +502,26 @@ export default function FacultyAssignmentsPage() {
     setShowAddForm(true);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (file) {
+  //     setNewAssignment((prev) => ({ ...prev, document: file }));
+  //   }
+  // };
+   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setNewAssignment((prev) => ({ ...prev, document: file }));
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        setUploadError(`File size exceeds the 24MB limit. Current size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
+        setNewAssignment((prev) => ({ ...prev, document: null })); // Clear selected file if too large
+        e.target.value = ''; // Clear the input field to allow re-selection
+      } else {
+        setNewAssignment((prev) => ({ ...prev, document: file }));
+        setUploadError(null); // Clear any previous error
+      }
+    } else {
+      setNewAssignment((prev) => ({ ...prev, document: null })); // Clear file if nothing selected
+      setUploadError(null); // Clear error if no file is selected
     }
   };
 
@@ -640,6 +658,9 @@ export default function FacultyAssignmentsPage() {
                         Selected: {newAssignment.document.name}
                       </p>
                     )}
+                     {uploadError && ( // Add this line to display the error
+                      <p className="text-sm text-red-500 mt-2">{uploadError}</p>
+                    )}
                   </div>
                   <Button
                     onClick={handleAddOrUpdateAssignment}
@@ -768,7 +789,7 @@ export default function FacultyAssignmentsPage() {
                           className="hover:bg-primary/5 transition-all duration-300"
                         >
                           <TableCell className="font-medium text-foreground">{assignment.title}</TableCell>
-                          <TableCell className="text-muted-foreground">{assignment.dueDate}</TableCell>
+                          <TableCell className="text-muted-foreground">{new Date(assignment.dueDate).toLocaleDateString()}</TableCell>
                           <TableCell className="text-muted-foreground">
                             {assignment.submissions}/{assignment.totalStudents}
                           </TableCell>
@@ -866,12 +887,20 @@ export default function FacultyAssignmentsPage() {
                           className="hover:bg-primary/5 transition-all duration-300"
                         >
                           <TableCell className="font-medium text-foreground">{submission.userName}</TableCell>
-                          <TableCell className="text-muted-foreground">{submission.uploadedAt}</TableCell>
                           <TableCell className="text-muted-foreground">
-                            <a href={`https://docs.google.com/viewer?url=${encodeURIComponent(submission.assignmentDocUrl)}`}
-                              target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-                              View File
-                            </a>
+  {new Date(submission.uploadedAt).toLocaleDateString()}
+</TableCell>
+                          <TableCell className="text-muted-foreground">
+                           <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewDocument(submission.assignmentDocUrl ?? null)}
+                            className="border-border text-foreground hover:bg-primary/10"
+                            disabled={!submission.assignmentDocUrl}
+                          >
+                            <File className="h-4 w-4 mr-2" />
+                            View Assignment
+                          </Button>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {submission.grade !== undefined ? `${submission.grade}/100` : "Not Graded"}

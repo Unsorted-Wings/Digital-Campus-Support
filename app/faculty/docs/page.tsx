@@ -18,7 +18,8 @@ import {
   Download,
   ChevronUp,
   ChevronDown,
-  Loader2
+  Loader2,
+  File
 } from "lucide-react";
 import { use, useEffect, useState } from "react";
 import {
@@ -44,6 +45,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { set } from "date-fns";
+const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
 interface Document {
   id: number;
@@ -86,9 +88,10 @@ export default function FacultyDocRepoPage() {
       subjectName: string;
     }[]
   >([]);
-  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true); 
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
   const [isLoadingResources, setIsLoadingResources] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -375,7 +378,7 @@ export default function FacultyDocRepoPage() {
 
   const handleRemoveDocument = async (doc: Resource) => {
     try {
-       setDeletingId(doc.id);
+      setDeletingId(doc.id);
       console.log(doc)
       const response = await fetch("/api/DocRepo/deleteResource/", {
         method: "DELETE",
@@ -399,8 +402,8 @@ export default function FacultyDocRepoPage() {
 
     } catch (err: any) {
       console.log(err)
-    }finally {
-        setDeletingId(null); // Reset after deletion attempt
+    } finally {
+      setDeletingId(null); // Reset after deletion attempt
     }
 
   };
@@ -408,13 +411,31 @@ export default function FacultyDocRepoPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setNewDocument((prev) => ({ ...prev, file }));
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        setUploadError(`File size exceeds the 24MB limit. Current size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
+        setNewDocument((prev) => ({ ...prev, file: null })); // Clear selected file if too large
+        e.target.value = ''; // Clear the input field to allow re-selection
+      } else {
+        setNewDocument((prev) => ({ ...prev, file }));
+        setUploadError(null); // Clear any previous error
+      }
+    } else {
+      setNewDocument((prev) => ({ ...prev, file: null })); // Clear file if nothing selected
+      setUploadError(null); // Clear error if no file is selected
     }
   };
 
   const handleToggleCourse = (name: string, open: boolean) => {
     setOpenCourses((prev) => ({ ...prev, [name]: open }));
   };
+  const handleViewDocument = (url: string | null | undefined) => {
+    if (url) {
+      const googleDocsViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+      window.open(googleDocsViewerUrl, "_blank");
+    } else {
+      alert("No document URL available");
+    }
+  };;
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
@@ -514,6 +535,10 @@ export default function FacultyDocRepoPage() {
                       <p className="text-sm text-muted-foreground mt-1">
                         Selected: {newDocument.file.name}
                       </p>
+                    )}
+
+                    {uploadError && ( // Add this line to display the error
+                      <p className="text-sm text-red-500 mt-2">{uploadError}</p>
                     )}
                   </div>
                   <Button
@@ -618,7 +643,7 @@ export default function FacultyDocRepoPage() {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="text-foreground">Name</TableHead>
-                    <TableHead className="text-foreground">File Path</TableHead>
+                    <TableHead className="text-foreground">View</TableHead>
                     <TableHead className="text-foreground">Uploaded</TableHead>
 
                     <TableHead className="text-foreground">Action</TableHead>
@@ -644,39 +669,46 @@ export default function FacultyDocRepoPage() {
                           {doc.name}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          <a href={`https://docs.google.com/viewer?url=${encodeURIComponent(doc.fileUrl)}`}
-                            target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-                            View File
-                          </a>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewDocument(doc.fileUrl ?? null)}
+                            className="border-border text-foreground hover:bg-primary/10"
+                            disabled={!doc.fileUrl}
+                          >
+                            <File className="h-4 w-4 mr-2" />
+                            View Document
+                          </Button>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {doc.createdAt.slice(0, 10)}
+                         {new Date(doc.createdAt).toLocaleDateString()}
                         </TableCell>
 
-                       <TableCell className="flex gap-2 ">
-    <Button
-        variant="outline"
-        size="sm"
-        className="border-border text-foreground hover:bg-primary/10"
-    >
-        <a href={doc.fileUrl} download>
-            <Download className="h-4 w-4 " />
-        </a>
-    </Button>
-    <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => handleRemoveDocument(doc)}
-        className="text-destructive hover:bg-destructive/10"
-        disabled={deletingId === doc.id} // Disable if this doc is being deleted
-    >
-        {deletingId === doc.id ? (
-            <Loader2 className="h-4 w-4 animate-spin" /> // Show loader
-        ) : (
-            <Trash2 className="h-4 w-4" /> // Show trash icon
-        )}
-    </Button>
-</TableCell>
+                        <TableCell className="flex gap-2 ">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-border text-foreground hover:bg-primary/10"
+                          >
+                            <a href={doc.fileUrl} download>
+                              <Download className="h-4 w-4 " />
+                            </a>
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveDocument(doc)}
+                            className="text-destructive hover:bg-destructive/10"
+                            disabled={deletingId === doc.id} // Disable if this doc is being deleted
+                          >
+                            {deletingId === doc.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" /> // Show loader
+                            ) : (
+                              <Trash2 className="h-4 w-4" /> // Show trash icon
+                            )}
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (

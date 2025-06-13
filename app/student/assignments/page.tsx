@@ -26,10 +26,11 @@ import {
   CheckCircle,
   Filter,
   ArrowUpDown,
-  Loader2
+  Loader2,
+  Eye
 } from "lucide-react";
 import { useState, useEffect } from "react";
-
+const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 // Define the type for your assignment data
 interface Assignment {
   id: number;
@@ -50,7 +51,7 @@ interface Assignment {
 
 }
 interface Submission {
-  userId: number;
+  userId: string;
   uploadedAt: string;
   assignmentDocUrl: string;
   grade?: number;
@@ -109,7 +110,6 @@ export default function AssignmentSubmissionPage() {
     const courseId = parsedUser?.courseId || null;
 
     setIsLoadingAssignments(true);
-     setIsLoadingAssignments(true);
     try {
       console.log("course id : ", courseId);
       if (!courseId || !uid) throw new Error("Course ID not found in local storage");
@@ -140,7 +140,6 @@ export default function AssignmentSubmissionPage() {
       console.error("Error fetching assignments:", error);
     } finally {
       setIsLoadingAssignments(false);
-       setIsLoadingAssignments(true);
     }
   };
   const fetchSubjects = async () => {
@@ -162,7 +161,7 @@ export default function AssignmentSubmissionPage() {
       const data = await response.json();
       console.log(data)
       setSubjects(data.simplifiedSubjects);
-     
+
     } catch (error: any) {
       console.error("Error fetching assignments:", error);
     } finally {
@@ -204,8 +203,19 @@ export default function AssignmentSubmissionPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setUploadError(`File size exceeds the 25MB limit. Current size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
+      setSelectedFile(null); // Clear selected file if too large
+      e.target.value = ''; // Clear the input field to allow re-selection
+    } else {
       setSelectedFile(file);
+      setUploadError(null); // Clear any previous error
+      setUploadSuccess(false); // Reset success message
     }
+  } else {
+    setSelectedFile(null);
+    setUploadError(null); // Clear error if no file is selected
+  }
   };
 
   const handleSubmit = async (assignmentId: number) => {
@@ -306,6 +316,16 @@ export default function AssignmentSubmissionPage() {
       setSortOrder("asc");
     }
   };
+  const handleViewDocument = (url: string | null | undefined) => {
+    console.log(url)
+    if (url) {
+      const googleDocsViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+      window.open(googleDocsViewerUrl, "_blank");
+    } else {
+      alert("No document URL available");
+    }
+  };
+  // Find the current user's submission for this assignment
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -329,46 +349,46 @@ export default function AssignmentSubmissionPage() {
               Assignments
             </CardTitle>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-             <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="flex items-center gap-2 border-border"
-                disabled={isLoadingSubjects} // Disable dropdown while subjects are loading
-              >
-                <Filter className="h-5 w-5" />
-                Subject: {filterSubject}
-                {isLoadingSubjects && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
-              {isLoadingSubjects ? (
-                <DropdownMenuItem className="flex items-center justify-center py-2">
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Loading Subjects...
-                </DropdownMenuItem>
-              ) : (
-                <>
-                  <DropdownMenuItem
-                    key="all"
-                    onClick={() => setFilterSubject("All")}
-                    className="hover:bg-primary/10"
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 border-border"
+                    disabled={isLoadingSubjects} // Disable dropdown while subjects are loading
                   >
-                    All
-                  </DropdownMenuItem>
-                  {allSubjects.map((subject) => (
-                    <DropdownMenuItem
-                      key={subject.id}
-                      onClick={() => setFilterSubject(subject.name)}
-                      className="hover:bg-primary/10"
-                    >
-                      {subject.name}
+                    <Filter className="h-5 w-5" />
+                    Subject: {filterSubject}
+                    {isLoadingSubjects && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-card/95 backdrop-blur-md border-border">
+                  {isLoadingSubjects ? (
+                    <DropdownMenuItem className="flex items-center justify-center py-2">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Loading Subjects...
                     </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  ) : (
+                    <>
+                      <DropdownMenuItem
+                        key="all"
+                        onClick={() => setFilterSubject("All")}
+                        className="hover:bg-primary/10"
+                      >
+                        All
+                      </DropdownMenuItem>
+                      {allSubjects.map((subject) => (
+                        <DropdownMenuItem
+                          key={subject.id}
+                          onClick={() => setFilterSubject(subject.name)}
+                          className="hover:bg-primary/10"
+                        >
+                          {subject.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -394,14 +414,14 @@ export default function AssignmentSubmissionPage() {
             </div>
           </CardHeader>
           <ScrollArea className="flex-1 relative z-10 p-4">
-        {isLoadingAssignments ? ( // Conditional render for assignment loading
-          <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="mt-2 text-muted-foreground">Loading assignments...</p>
-          </div>
-        ) : (
-          <Table>
-             <TableHeader>
+            {isLoadingAssignments ? ( // Conditional render for assignment loading
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="mt-2 text-muted-foreground">Loading assignments...</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead>
                       <Button
@@ -425,72 +445,112 @@ export default function AssignmentSubmissionPage() {
                       </Button>
                     </TableHead>
                     <TableHead className="text-foreground">Status</TableHead>
+                    <TableHead className="text-foreground">View</TableHead>
                     <TableHead className="text-foreground">Action</TableHead>
                   </TableRow>
                 </TableHeader>
-            <TableBody>
-              {filteredAndSortedAssignments.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    No assignments found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredAndSortedAssignments.map((assignment: Assignment) => (
-                  <TableRow
-                      key={assignment.id}
-                      className={cn(
-                        "transition-all duration-300",
-                        selectedAssignment === assignment.id
-                          ? "bg-primary/10"
-                          : "hover:bg-primary/5"
-                      )}
-                    >
-                      <TableCell className="font-medium text-foreground">
-                        {assignment.title}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {assignment.subject} {/* Display the subject here */}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {new Date(assignment.dueDate).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            "flex items-center gap-1 text-sm",
-                            assignment.status === "Submitted"
-                              ? "text-green-500"
-                              : "text-yellow-500"
-                          )}
-                        >
-                          {assignment.status === "Submitted" ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : (
-                            <Clock className="h-4 w-4" />
-                          )}
-                          {assignment.status}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {assignment.status !== "Submitted" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedAssignment(assignment.id)}
-                            className="border-border text-foreground hover:bg-primary/10"
-                          >
-                            Submit
-                          </Button>
-                        )}
+                <TableBody>
+                  {filteredAndSortedAssignments.length === 0 ? (
+
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No assignments found.
                       </TableCell>
                     </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        )}
-      </ScrollArea>
+                  ) : (
+                    filteredAndSortedAssignments.map((assignment: Assignment) => {
+                      const currentUserSubmission = assignment.submittedBy?.find(
+                        (submission) => submission.userId === user?.id
+                      );
+
+                      return (
+                        <TableRow
+                          key={assignment.id}
+                          className={cn(
+                            "transition-all duration-300",
+                            selectedAssignment === assignment.id
+                              ? "bg-primary/10"
+                              : "hover:bg-primary/5"
+                          )}
+                        >
+                          <TableCell className="font-medium text-foreground">
+                            {assignment.title}
+                          </TableCell>
+
+                          <TableCell className="text-muted-foreground">
+                            {assignment.subject}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {new Date(assignment.dueDate).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={cn(
+                                "flex items-center gap-1 text-sm",
+                                assignment.status === "Submitted"
+                                  ? "text-green-500"
+                                  : "text-yellow-500"
+                              )}
+                            >
+                              {assignment.status === "Submitted" ? (
+                                <CheckCircle className="h-4 w-4" />
+                              ) : (
+                                <Clock className="h-4 w-4" />
+                              )}
+                              {assignment.status}
+                            </span>
+                          </TableCell>
+
+                          {/* TableCell for "View Original Assignment Document" button */}
+                          <TableCell>
+                            <div className="flex gap-2 justify-center items-center">
+                              <Button
+                                variant="outline"
+                                className="bg-primary/10 text-foreground hover:bg-primary/20 p-2 rounded-full"
+                                onClick={() => handleViewDocument(assignment.assignmentDocUrl ?? null)}
+                                disabled={!assignment.assignmentDocUrl}
+                                aria-label={`View assignment document: ${assignment.title}`}
+                              >
+                                <Eye className="h-5 w-5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+
+                          {/* TableCell for "Action" (Submit or View Submission) */}
+                          <TableCell>
+                            {assignment.status === "Pending" ? (
+                              // If status is "Pending", show Submit button
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedAssignment(assignment.id)}
+                                className="border-border text-foreground hover:bg-primary/10"
+                              >
+                                Submit
+                              </Button>
+                            ) : (
+                              // If status is "Submitted", show View Submission button
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                // Now currentUserSubmission is correctly defined within this scope
+                                onClick={() => handleViewDocument(currentUserSubmission?.assignmentDocUrl ?? null)}
+                                disabled={!currentUserSubmission?.assignmentDocUrl}
+                                className="border-border text-foreground hover:bg-primary/10"
+                              >
+                                View 
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+
+                </TableBody>
+              </Table>
+            )}
+          </ScrollArea>
         </Card>
 
         {/* Submission Form */}
