@@ -89,11 +89,11 @@ export default function AttendancePage() {
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
       {/* Header */}
-      <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
+       <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden mt-4 min-h-[60px]">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-        <CardHeader className="p-4 flex justify-between relative z-10">
-          <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <UserCheck className="h-6 w-6 text-primary" />
+        <CardHeader className="px-6 py-5 flex  gap-3 relative z-10">
+          <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-3">
+            <UserCheck className="h-7 w-7 text-primary" />
             Attendance
           </CardTitle>
         </CardHeader>

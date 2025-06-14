@@ -251,7 +251,7 @@ export default function SchedulePage() {
       const fetchAndSetEvents = async () => {
         try {
           const response = await fetch(
-            `/api/schedule/viewSchedule/viewStudentSchedule?userId=${user.uid}`
+            `/api/schedule/viewSchedule/viewPersonalSchedule?userId=${user.uid}`
           );
           const data = await response.json();
 
