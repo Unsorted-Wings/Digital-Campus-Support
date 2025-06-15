@@ -4,6 +4,9 @@ import { firestore } from "@/lib/firebase/firebaseAdmin"; // Assuming you have t
 import * as admin from "firebase-admin";
 
 // Initialize Firebase Admin if not already initialized
+
+export const dynamic = "force-dynamic"; // Ensure this route is always dynamic
+
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.cert({

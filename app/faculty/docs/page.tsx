@@ -19,7 +19,7 @@ import {
   ChevronUp,
   ChevronDown,
   Loader2,
-  File
+  File,
 } from "lucide-react";
 import { use, useEffect, useState } from "react";
 import {
@@ -110,7 +110,7 @@ export default function FacultyDocRepoPage() {
   }, []);
 
   const fetchSubjects = async () => {
-    setIsLoadingSubjects(true)
+    setIsLoadingSubjects(true);
     try {
       console.log(user);
       const response = await fetch(
@@ -130,7 +130,8 @@ export default function FacultyDocRepoPage() {
   };
 
   useEffect(() => {
-    if (user) { // Only fetch subjects if user is available
+    if (user) {
+      // Only fetch subjects if user is available
       fetchSubjects();
     }
   }, [user]);
@@ -207,21 +208,30 @@ export default function FacultyDocRepoPage() {
     },
     []
   );
-  const getCourseInfoFromSubjectAndCourse = (subjectName: string, courseName: string) => {
+  const getCourseInfoFromSubjectAndCourse = (
+    subjectName: string,
+    courseName: string
+  ) => {
     if (!groupedCourses || groupedCourses.length === 0) {
-      console.warn("groupedCourses is not initialized or empty when calling getCourseInfoFromSubjectAndCourse.");
+      console.warn(
+        "groupedCourses is not initialized or empty when calling getCourseInfoFromSubjectAndCourse."
+      );
       return null;
     }
 
     const match = groupedCourses.find((course) => course.name === courseName);
     if (!match) {
-      console.error(`Course not found in groupedCourses for name: ${courseName}`);
+      console.error(
+        `Course not found in groupedCourses for name: ${courseName}`
+      );
       return null;
     }
 
     const subject = match.subjects.find((s) => s.name === subjectName);
     if (!subject) {
-      console.error(`Subject "${subjectName}" not found within course "${courseName}".`);
+      console.error(
+        `Subject "${subjectName}" not found within course "${courseName}".`
+      );
       return null;
     }
 
@@ -248,7 +258,8 @@ export default function FacultyDocRepoPage() {
 
     const courseName = courseBatch ? courseBatch.name : "Unknown Course/Batch"; // More specific
     const subjectName = subjectId
-      ? courseBatch?.subjects.find((s) => s.id === subjectId)?.name || "Unknown Subject"
+      ? courseBatch?.subjects.find((s) => s.id === subjectId)?.name ||
+        "Unknown Subject"
       : "No Subject Specified"; // More specific
 
     return { courseName, subjectName };
@@ -256,14 +267,16 @@ export default function FacultyDocRepoPage() {
   const fetchResources = async () => {
     setIsLoadingResources(true);
     try {
-      const response = await fetch(`/api/DocRepo/viewResource?teacherId=${user?.id}`);
+      const response = await fetch(
+        `/api/DocRepo/viewResource?teacherId=${user?.id}`
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to fetch resources: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log(result)
+      console.log(result);
       const filtered = result.map((item: any) => {
         // Use the helper function to get names based on IDs
         const { courseName, subjectName } = getCourseAndSubjectNames(
@@ -308,20 +321,82 @@ export default function FacultyDocRepoPage() {
     }
   }, [user, subjectData]);
 
+  const fetchBatchStudents = async (courseId: string, batchId: string) => {
+    try {
+      const response = await fetch(
+        `/api/students/viewStudent/viewBatchwiseStudents?courseId=${courseId}&batchId=${batchId}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch batch students");
+      }
+      const data = await response.json();
+      return data.students || [];
+    } catch (error) {
+      console.error("Error fetching batch students:", error);
+      return [];
+    }
+  };
+
+  const createAssignmentNotification = async (
+    userIds: string[],
+    title: string
+  ) => {
+    try {
+      const notificationData = {
+        userIds,
+        title: `Uploaded Notes: ${title}`,
+        description: `New notes have been uploaded for the subject. Please check the document repository for details.`,
+        type: "notes",
+        sentBy: user?.id,
+        date: new Date().toISOString().split("T")[0], 
+      };
+
+      const response = await fetch(
+        "/api/notifications/appNotifications/createNotification",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(notificationData),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to create assignment notification");
+      }
+
+      const result = await response.json();
+      console.log("Notification created successfully:", result);
+    } catch (error) {
+      console.error("Error creating assignment notification:", error);
+    }
+  };
+
   const filteredResources = selectedCourse
     ? selectedSubject
-      ? resources.filter((resource) => resource.subjectName === selectedSubject && resource.courseName === selectedCourse)
+      ? resources.filter(
+          (resource) =>
+            resource.subjectName === selectedSubject &&
+            resource.courseName === selectedCourse
+        )
       : resources.filter((resource) => resource.courseName === selectedCourse)
     : selectedSubject
       ? resources.filter((resource) => resource.subjectName === selectedSubject)
       : resources;
 
-
-
   const handleUpload = async () => {
-    if (newDocument.name && newDocument.subject && newDocument.file && newDocument.course) {
-      const courseInfo = getCourseInfoFromSubjectAndCourse(newDocument.subject, newDocument.course);
-      console.log(courseInfo)
+    if (
+      newDocument.name &&
+      newDocument.subject &&
+      newDocument.file &&
+      newDocument.course
+    ) {
+      const courseInfo = getCourseInfoFromSubjectAndCourse(
+        newDocument.subject,
+        newDocument.course
+      );
+      console.log(courseInfo);
       if (!courseInfo) {
         console.error("Subject or course not found in groupedCourses");
         return;
@@ -336,21 +411,22 @@ export default function FacultyDocRepoPage() {
           // Handle cases where semester details are not found or API errors
           const errorData = await semesterResponse.json();
           console.error("Failed to fetch semester details:", errorData.error);
-          throw new Error(errorData.error || "Failed to fetch semester details");
+          throw new Error(
+            errorData.error || "Failed to fetch semester details"
+          );
         }
         const semesterData = await semesterResponse.json();
         const semesterId = semesterData.semesterId;
 
         const formData = new FormData();
         formData.append("file", newDocument.file);
-        formData.append("name", newDocument.name)
+        formData.append("name", newDocument.name);
         formData.append("courseId", courseInfo.courseId || "");
         formData.append("semesterId", semesterId || "");
         formData.append("batchId", courseInfo.batchId || "");
         formData.append("subjectId", courseInfo.subjectId || "");
         formData.append("description", "Sample Assignment");
         formData.append("type", "notes");
-
 
         const response = await fetch("/api/DocRepo/uploadAssignment", {
           method: "POST",
@@ -364,10 +440,28 @@ export default function FacultyDocRepoPage() {
 
         await fetchResources();
 
+        try {
+          const fetchedStudents = await fetchBatchStudents(
+            courseInfo.courseId,
+            courseInfo.batchId
+          );
+
+          if (!fetchedStudents || fetchedStudents.length === 0) {
+            console.warn("No students found for the given course and batch.");
+            return;
+          }
+
+          const userIds: string[] = fetchedStudents.map(
+            (student: any) => student.studentId
+          );
+          createAssignmentNotification(userIds, newDocument.name);
+        } catch (error) {
+          console.error("Error fetching batch students:", error);
+          return;
+        }
       } catch (error: any) {
-        console.log("error: ", error)
-      }
-      finally {
+        console.log("error: ", error);
+      } finally {
         setIsUploading(false);
       }
 
@@ -379,7 +473,7 @@ export default function FacultyDocRepoPage() {
   const handleRemoveDocument = async (doc: Resource) => {
     try {
       setDeletingId(doc.id);
-      console.log(doc)
+      console.log(doc);
       const response = await fetch("/api/DocRepo/deleteResource/", {
         method: "DELETE",
         headers: {
@@ -399,22 +493,22 @@ export default function FacultyDocRepoPage() {
       }
       setResources((prev) => prev.filter((r) => r.id !== doc.id));
       console.log(`Removed resource ID: ${doc.id}`);
-
     } catch (err: any) {
-      console.log(err)
+      console.log(err);
     } finally {
       setDeletingId(null); // Reset after deletion attempt
     }
-
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > MAX_FILE_SIZE_BYTES) {
-        setUploadError(`File size exceeds the 24MB limit. Current size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
+        setUploadError(
+          `File size exceeds the 24MB limit. Current size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`
+        );
         setNewDocument((prev) => ({ ...prev, file: null })); // Clear selected file if too large
-        e.target.value = ''; // Clear the input field to allow re-selection
+        e.target.value = ""; // Clear the input field to allow re-selection
       } else {
         setNewDocument((prev) => ({ ...prev, file }));
         setUploadError(null); // Clear any previous error
@@ -435,7 +529,7 @@ export default function FacultyDocRepoPage() {
     } else {
       alert("No document URL available");
     }
-  };;
+  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
@@ -501,21 +595,26 @@ export default function FacultyDocRepoPage() {
                           ))
                         )}
                       </SelectContent>
-
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="course" className="text-foreground">Course</Label>
+                    <Label htmlFor="course" className="text-foreground">
+                      Course
+                    </Label>
                     <Select
                       value={newDocument.course}
-                      onValueChange={(value) => setNewDocument((prev) => ({ ...prev, course: value }))}
+                      onValueChange={(value) =>
+                        setNewDocument((prev) => ({ ...prev, course: value }))
+                      }
                     >
                       <SelectTrigger className="bg-muted/50 border-border rounded-md">
                         <SelectValue placeholder="Select course" />
                       </SelectTrigger>
                       <SelectContent>
                         {groupedCourses.map((course) => (
-                          <SelectItem key={course.name} value={course.name}>{course.name}</SelectItem>
+                          <SelectItem key={course.name} value={course.name}>
+                            {course.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -569,8 +668,8 @@ export default function FacultyDocRepoPage() {
               className={cn(
                 "p-2 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300 mb-2",
                 !selectedCourse &&
-                !selectedSubject &&
-                "bg-primary/20 border-l-4 border-primary"
+                  !selectedSubject &&
+                  "bg-primary/20 border-l-4 border-primary"
               )}
               onClick={() => {
                 setSelectedCourse(null);
@@ -582,10 +681,14 @@ export default function FacultyDocRepoPage() {
             {isLoadingSubjects ? ( // Conditional render for subject loading
               <div className="flex items-center justify-center p-4">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <span className="ml-2 text-muted-foreground">Loading Courses and  Subjects...</span>
+                <span className="ml-2 text-muted-foreground">
+                  Loading Courses and Subjects...
+                </span>
               </div>
             ) : groupedCourses.length === 0 ? (
-              <div className="p-4 text-muted-foreground text-center">No subjects found.</div>
+              <div className="p-4 text-muted-foreground text-center">
+                No subjects found.
+              </div>
             ) : (
               groupedCourses.map((course) => (
                 <Collapsible
@@ -598,8 +701,8 @@ export default function FacultyDocRepoPage() {
                     className={cn(
                       "flex items-center justify-between w-full p-2 text-foreground rounded-md hover:bg-primary/10 transition-all duration-300",
                       selectedCourse === course.name &&
-                      !selectedSubject &&
-                      "bg-primary/20 border-l-4 border-primary"
+                        !selectedSubject &&
+                        "bg-primary/20 border-l-4 border-primary"
                     )}
                   >
                     <span>{course.name}</span>
@@ -616,8 +719,8 @@ export default function FacultyDocRepoPage() {
                         className={cn(
                           "p-2 pl-6 text-foreground rounded-md cursor-pointer hover:bg-primary/10 transition-all duration-300",
                           selectedCourse === course.name &&
-                          selectedSubject === subject.name &&
-                          "bg-primary/20 border-l-4 border-primary"
+                            selectedSubject === subject.name &&
+                            "bg-primary/20 border-l-4 border-primary"
                         )}
                         onClick={() => {
                           setSelectedCourse(course.name);
@@ -652,7 +755,10 @@ export default function FacultyDocRepoPage() {
                 <TableBody>
                   {isLoadingResources ? ( // Conditional render for resource loading
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      <TableCell
+                        colSpan={4}
+                        className="text-center text-muted-foreground"
+                      >
                         <div className="flex items-center justify-center p-4">
                           <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
                           <span>Loading Documents...</span>
@@ -672,7 +778,9 @@ export default function FacultyDocRepoPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleViewDocument(doc.fileUrl ?? null)}
+                            onClick={() =>
+                              handleViewDocument(doc.fileUrl ?? null)
+                            }
                             className="border-border text-foreground hover:bg-primary/10"
                             disabled={!doc.fileUrl}
                           >
@@ -681,7 +789,7 @@ export default function FacultyDocRepoPage() {
                           </Button>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                         {new Date(doc.createdAt).toLocaleDateString()}
+                          {new Date(doc.createdAt).toLocaleDateString()}
                         </TableCell>
 
                         <TableCell className="flex gap-2 ">

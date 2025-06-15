@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
   // console.log(user);
 
   let courseId = null;
+  let isAlumni = false;
 
   // If student, fetch courseId from students collection
   if (user.role === "student") {
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
       .get();
     if (studentDoc.exists) {
       courseId = studentDoc.data()?.courseId ?? null;
+      isAlumni = studentDoc.data()?.isAlumni || false;
     }
   }
 
@@ -56,7 +58,7 @@ export async function GET(req: NextRequest) {
     email: user.email,
     name: user.name,
     role: user.role,
-    ...(user.role === "student" && { courseId }),
+    ...(user.role === "student" && { courseId } && { isAlumni }),
     ...(user.role === "faculty" && { subjects: user.subjects || [] }),
   });
 }

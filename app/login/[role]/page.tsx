@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Mail, Lock, ArrowLeft } from "lucide-react";
 import { signIn } from "next-auth/react";
+import { toast } from "@/hooks/use-toast";
 // import { collection, query, where, getDocs } from "firebase/firestore";
 // import { db } from "@/lib/firebase/firebaseConfig";
 
@@ -37,6 +38,7 @@ export default function RoleLoginPage({
 
       if (result?.error) {
         setError("Invalid email or password.");
+
         return;
       }
 
@@ -46,9 +48,19 @@ export default function RoleLoginPage({
       const user = await userRes.json();
 
       // Step 3: Check if role matches
-      if (!user || user.role !== params.role) {
+      if (params.role === "alumni" && user.isAlumni === true) {
+        localStorage.setItem("user", JSON.stringify(user));
+        router.push(`/${params.role}/home`);
+      } 
+      else if (!user || user.role !== params.role) {
         setError("Access denied.");
+
         return;
+      }
+
+      if (params.role === "alumni" && user.isAlumni === true) {
+        localStorage.setItem("user", JSON.stringify(user));
+        router.push(`/${params.role}/home`);
       }
 
       // Step 4: Store user data in localStorage
@@ -104,6 +116,11 @@ export default function RoleLoginPage({
             className="space-y-4"
             aria-label={`${role} login form`}
           >
+            {error && (
+              <p className="text-destructive text-sm mb-4 bg-destructive/10 p-2 rounded shadow-sm">
+                {error}
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground font-medium">
                 Email

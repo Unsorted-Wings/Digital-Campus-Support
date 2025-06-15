@@ -251,7 +251,7 @@ export default function SchedulePage() {
       const fetchAndSetEvents = async () => {
         try {
           const response = await fetch(
-            `/api/schedule/viewSchedule/viewStudentSchedule?userId=${user.uid}`
+            `/api/schedule/viewSchedule/viewPersonalSchedule?userId=${user.uid}`
           );
           const data = await response.json();
 
@@ -369,11 +369,7 @@ export default function SchedulePage() {
       console.error("End time must be after start time.");
       return;
     }
-    if (!newEvent.subject) {
-      setEventError("Subject is required.");
-      console.error("Subject is required.");
-      return;
-    }
+
     const newEventData = {
       id: events.length + 1,
       title: newEvent.title,
@@ -381,8 +377,6 @@ export default function SchedulePage() {
       end: endDate,
       subject: newEvent.subject,
     };
-
-    console.log("New Event Data:", newEventData);
     setEvents([...events, newEventData]);
     setNewEvent({ title: "", start: "", end: "", subject: "" });
     setShowAddEvent(false);
@@ -766,35 +760,6 @@ export default function SchedulePage() {
                 }
                 className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
               />
-            </div>
-
-            <div>
-              <Label htmlFor="subject" className="text-foreground">
-                Subject
-              </Label>
-              <Select
-                value={newEvent.subject}
-                onValueChange={(value) => {
-                  const selected = studentSubjects.find(
-                    (subject) => subject.id === value
-                  );
-                  setNewEvent({ ...newEvent, subject: value });
-                  if (selected) {
-                    setSelectedSubject(selected.name);
-                  }
-                }}
-              >
-                <SelectTrigger className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg">
-                  <SelectValue placeholder="Select subject" />
-                </SelectTrigger>
-                <SelectContent>
-                  {studentSubjects.map((subject) => (
-                    <SelectItem key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             <DialogFooter>

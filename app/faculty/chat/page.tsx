@@ -5,12 +5,32 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Send, Search, MoreVertical, BarChart2, CheckCheck, X, Smile, Check } from "lucide-react";
+import {
+  Send,
+  Search,
+  MoreVertical,
+  BarChart2,
+  CheckCheck,
+  X,
+  Smile,
+  Check,
+} from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import Link from "next/link";
@@ -46,7 +66,7 @@ interface User {
   email: string;
   name: string;
   role: string;
-};
+}
 
 export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -157,6 +177,41 @@ export default function ChatPage() {
     return format(date, "MMM d, yyyy HH:mm");
   };
 
+  const createChatNotification = async () => {
+    try {
+      const notificationData = {
+        userIds: selectedChat?.members.filter(
+          (memberId) => memberId !== user?.uid
+        ),
+        title: `New message: ${selectedChat?.name}`,
+        description: `You have a new message from ${selectedChat?.name}`,
+        type: "chat",
+        sentBy: user?.uid,
+        date: new Date().toISOString().split("T")[0],
+      };
+
+      const response = await fetch(
+        "/api/notifications/appNotifications/createNotification",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(notificationData),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to create assignment notification");
+      }
+
+      const result = await response.json();
+      console.log("Notification created successfully:", result);
+    } catch (error) {
+      console.error("Error creating assignment notification:", error);
+    }
+  };
+
   const handleSend = async () => {
     if (!message.trim() && !user) return;
 
@@ -165,7 +220,6 @@ export default function ChatPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-
         },
         body: JSON.stringify({
           senderId: user?.uid,
@@ -187,8 +241,9 @@ export default function ChatPage() {
       if (!res.ok) {
         return;
       }
+      createChatNotification();
 
-      setMessage("")
+      setMessage("");
     } catch (err) {
       console.error("Error sending message:", err);
     }
@@ -285,21 +340,20 @@ export default function ChatPage() {
   };
 
   async function handleReactMessage(chatId: string, emoji: string) {
-
     if (!selectedChat && !user) return;
 
     const userId = user?.uid;
     const roomId = selectedChat?.id;
 
-    const res = await fetch('/api/chat/updateChat/reaction', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch("/api/chat/updateChat/reaction", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ roomId, chatId, emoji, userId }),
     });
 
     const data = await res.json();
     if (data.error) {
-      console.error('Failed to update reaction:', data.error);
+      console.error("Failed to update reaction:", data.error);
     }
   }
 
@@ -311,7 +365,10 @@ export default function ChatPage() {
       return (
         <span>
           {text.replace(link, "")}{" "}
-          <Link href="/student/docs" className="text-primary underline hover:text-primary/80">
+          <Link
+            href="/student/docs"
+            className="text-primary underline hover:text-primary/80"
+          >
             {link}
           </Link>
         </span>
@@ -325,7 +382,9 @@ export default function ChatPage() {
       {/* Sidebar */}
       <Card className="w-[300px] bg-card/95 backdrop-blur-md shadow-xl rounded-xl border-r border-border/50 flex flex-col">
         <CardHeader className="p-4 border-b border-border/30">
-          <CardTitle className="text-xl font-semibold text-foreground">Chats</CardTitle>
+          <CardTitle className="text-xl font-semibold text-foreground">
+            Chats
+          </CardTitle>
           <div className="relative mt-2">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -355,18 +414,22 @@ export default function ChatPage() {
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-foreground font-medium truncate">{room.name}</p>
+                <p className="text-foreground font-medium truncate">
+                  {room.name}
+                </p>
                 <p className="text-xs text-muted-foreground truncate">
                   {room.lastMessage
-                    ? `${room.lastMessage.senderName}: ${room.lastMessage.type === "poll"
-                      ? "📊 Poll"
-                      : room.lastMessage.message
-                    }`
-                    : "No messages yet"
-                  }
+                    ? `${room.lastMessage.senderName}: ${
+                        room.lastMessage.type === "poll"
+                          ? "📊 Poll"
+                          : room.lastMessage.message
+                      }`
+                    : "No messages yet"}
                 </p>
               </div>
-              <p className="text-xs text-muted-foreground flex-shrink-0">{formatTimestamp(room.lastMessage?.updatedAt ?? "")}</p>
+              <p className="text-xs text-muted-foreground flex-shrink-0">
+                {formatTimestamp(room.lastMessage?.updatedAt ?? "")}
+              </p>
             </div>
           ))}
         </ScrollArea>
@@ -378,7 +441,10 @@ export default function ChatPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Avatar className="w-10 h-10">
-                  <AvatarImage src={`/chat-${selectedChat}.jpg`} alt={selectedChat?.name} />
+                  <AvatarImage
+                    src={`/chat-${selectedChat}.jpg`}
+                    alt={selectedChat?.name}
+                  />
                   <AvatarFallback className="bg-primary/20 text-primary">
                     {selectedChat?.name.charAt(0)}
                   </AvatarFallback>
@@ -397,11 +463,14 @@ export default function ChatPage() {
           </CardHeader>
           <ScrollArea className="flex-1 p-6 h-full min-h-0" ref={scrollRef}>
             <div className="space-y-4">
-
-              {
-                messages.filter((msg) => msg.roomId === selectedChat?.id).length === 0 ? (
-                  <div className="text-center text-sm text-muted mt-4">No messages yet</div>
-                ) : (messages.filter((msg) => msg.roomId === selectedChat.id)
+              {messages.filter((msg) => msg.roomId === selectedChat?.id)
+                .length === 0 ? (
+                <div className="text-center text-sm text-muted mt-4">
+                  No messages yet
+                </div>
+              ) : (
+                messages
+                  .filter((msg) => msg.roomId === selectedChat.id)
                   .map((msg) => (
                     <div
                       key={msg.id}
@@ -412,7 +481,10 @@ export default function ChatPage() {
                     >
                       {!msg.isSent && (
                         <Avatar className="w-8 h-8 flex-shrink-0">
-                          <AvatarImage src={`/user-${msg.senderId}.jpg`} alt={msg.senderName} />
+                          <AvatarImage
+                            src={`/user-${msg.senderId}.jpg`}
+                            alt={msg.senderName}
+                          />
                           <AvatarFallback className="bg-primary/20 text-primary">
                             {msg.senderName.charAt(0)}
                           </AvatarFallback>
@@ -427,41 +499,57 @@ export default function ChatPage() {
                               : "bg-muted/70 text-foreground rounded-tl-none"
                           )}
                         >
-                          <p className="text-xs font-medium">{msg.senderName}</p>
-                          <p className="text-sm mt-1">{renderMessageContent(msg.message || "")}</p>
+                          <p className="text-xs font-medium">
+                            {msg.senderName}
+                          </p>
+                          <p className="text-sm mt-1">
+                            {renderMessageContent(msg.message || "")}
+                          </p>
                           <div className="flex items-center gap-1 mt-1 justify-end">
-                            <p className="text-xs text-muted-foreground">{formatTimestamp(msg.updatedAt)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatTimestamp(msg.updatedAt)}
+                            </p>
                             {msg.isSent && (
                               <CheckCheck
                                 className={cn(
                                   "h-4 w-4",
-                                  msg.readBy?.length === selectedChat.members.length
+                                  msg.readBy?.length ===
+                                    selectedChat.members.length
                                     ? "text-primary"
                                     : "text-muted-foreground"
                                 )}
                               />
                             )}
                           </div>
-                          {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                            <div className="flex gap-2 mt-1">
-                              {Object.entries(msg.reactions)
-                                .filter(([_, userIds]) => Array.isArray(userIds) && userIds.length > 0)
-                                .map(([emoji, userIds]) => (
-                                  <span key={emoji} className="text-xs">
-                                    {emoji} {userIds.length}
-                                  </span>
-                                ))}
-                            </div>
-                          )}
+                          {msg.reactions &&
+                            Object.keys(msg.reactions).length > 0 && (
+                              <div className="flex gap-2 mt-1">
+                                {Object.entries(msg.reactions)
+                                  .filter(
+                                    ([_, userIds]) =>
+                                      Array.isArray(userIds) &&
+                                      userIds.length > 0
+                                  )
+                                  .map(([emoji, userIds]) => (
+                                    <span key={emoji} className="text-xs">
+                                      {emoji} {userIds.length}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
                           <Select
-                            onValueChange={(emoji) => handleReactMessage(msg.id, emoji)}
+                            onValueChange={(emoji) =>
+                              handleReactMessage(msg.id, emoji)
+                            }
                           >
                             <SelectTrigger className="w-10 h-6 p-0 border-none bg-transparent">
                               <Smile className="h-4 w-4 text-muted-foreground" />
                             </SelectTrigger>
                             <SelectContent>
                               {["👍", "❤️", "😂"].map((emoji) => (
-                                <SelectItem key={emoji} value={emoji}>{emoji}</SelectItem>
+                                <SelectItem key={emoji} value={emoji}>
+                                  {emoji}
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -475,13 +563,25 @@ export default function ChatPage() {
                               : "bg-muted/70 text-foreground rounded-tl-none"
                           )}
                         >
-                          <p className="text-xs font-medium">{msg.senderName}</p>
-                          <p className="text-sm font-semibold mt-1">{msg.message}</p>
+                          <p className="text-xs font-medium">
+                            {msg.senderName}
+                          </p>
+                          <p className="text-sm font-semibold mt-1">
+                            {msg.message}
+                          </p>
                           <div className="mt-3 space-y-2">
                             {msg.pollOptions?.map((opt, idx) => {
-                              const totalVotes = msg.pollOptions?.reduce((sum, o) => sum + o.votes.length, 0) || 0;
-                              const percentage = totalVotes ? (opt.votes.length / totalVotes) * 100 : 0;
-                              const userVoted = user?.uid ? opt.votes.includes(user.uid) : false;
+                              const totalVotes =
+                                msg.pollOptions?.reduce(
+                                  (sum, o) => sum + o.votes.length,
+                                  0
+                                ) || 0;
+                              const percentage = totalVotes
+                                ? (opt.votes.length / totalVotes) * 100
+                                : 0;
+                              const userVoted = user?.uid
+                                ? opt.votes.includes(user.uid)
+                                : false;
 
                               return (
                                 <div
@@ -491,7 +591,9 @@ export default function ChatPage() {
                                 >
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2">
-                                      {userVoted && <Check className="h-4 w-4 text-primary" />}
+                                      {userVoted && (
+                                        <Check className="h-4 w-4 text-primary" />
+                                      )}
                                       <span className="text-sm text-foreground">
                                         {opt.text}
                                       </span>
@@ -500,51 +602,66 @@ export default function ChatPage() {
                                       <div
                                         className={cn(
                                           "h-1.5 rounded-full",
-                                          userVoted ? "bg-primary/50" : "bg-primary/30"
+                                          userVoted
+                                            ? "bg-primary/50"
+                                            : "bg-primary/30"
                                         )}
                                         style={{ width: `${percentage}%` }}
                                       />
                                     </div>
                                   </div>
-                                  <span className="text-xs text-muted-foreground">{opt.votes.length} votes</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {opt.votes.length} votes
+                                  </span>
                                 </div>
                               );
                             })}
-
                           </div>
                           <div className="flex items-center gap-1 mt-2 justify-end">
-                            <p className="text-xs text-muted-foreground">{formatTimestamp(msg.updatedAt)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatTimestamp(msg.updatedAt)}
+                            </p>
                             {msg.isSent && (
                               <CheckCheck
                                 className={cn(
                                   "h-4 w-4",
-                                  msg.readBy?.length === selectedChat.members.length
+                                  msg.readBy?.length ===
+                                    selectedChat.members.length
                                     ? "text-primary"
                                     : "text-muted-foreground"
                                 )}
                               />
                             )}
                           </div>
-                          {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                            <div className="flex gap-2 mt-1">
-                              {Object.entries(msg.reactions)
-                                .filter(([_, userIds]) => Array.isArray(userIds) && userIds.length > 0)
-                                .map(([emoji, userIds]) => (
-                                  <span key={emoji} className="text-xs">
-                                    {emoji} {userIds.length}
-                                  </span>
-                                ))}
-                            </div>
-                          )}
+                          {msg.reactions &&
+                            Object.keys(msg.reactions).length > 0 && (
+                              <div className="flex gap-2 mt-1">
+                                {Object.entries(msg.reactions)
+                                  .filter(
+                                    ([_, userIds]) =>
+                                      Array.isArray(userIds) &&
+                                      userIds.length > 0
+                                  )
+                                  .map(([emoji, userIds]) => (
+                                    <span key={emoji} className="text-xs">
+                                      {emoji} {userIds.length}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
                           <Select
-                            onValueChange={(emoji) => handleReactMessage(msg.id, emoji)}
+                            onValueChange={(emoji) =>
+                              handleReactMessage(msg.id, emoji)
+                            }
                           >
                             <SelectTrigger className="w-10 h-6 p-0 border-none bg-transparent">
                               <Smile className="h-4 w-4 text-muted-foreground" />
                             </SelectTrigger>
                             <SelectContent>
                               {["👍", "❤️", "😂"].map((emoji) => (
-                                <SelectItem key={emoji} value={emoji}>{emoji}</SelectItem>
+                                <SelectItem key={emoji} value={emoji}>
+                                  {emoji}
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -553,15 +670,19 @@ export default function ChatPage() {
                       {msg.isSent && (
                         <Avatar className="w-8 h-8 flex-shrink-0">
                           <AvatarImage src="/user-you.jpg" alt="You" />
-                          <AvatarFallback className="bg-primary/20 text-primary">{msg.senderName.charAt(0)}</AvatarFallback>
+                          <AvatarFallback className="bg-primary/20 text-primary">
+                            {msg.senderName.charAt(0)}
+                          </AvatarFallback>
                         </Avatar>
                       )}
                     </div>
-                  )))
-              }
+                  ))
+              )}
 
               {isTyping && (
-                <div className="text-sm text-muted-foreground italic">Typing...</div>
+                <div className="text-sm text-muted-foreground italic">
+                  Typing...
+                </div>
               )}
             </div>
           </ScrollArea>
@@ -610,9 +731,13 @@ export default function ChatPage() {
             <DialogTitle className="text-foreground">Create Poll</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 p-4">
-            {pollError && <p className="text-destructive text-sm">{pollError}</p>}
+            {pollError && (
+              <p className="text-destructive text-sm">{pollError}</p>
+            )}
             <div>
-              <Label htmlFor="pollQuestion" className="text-foreground">Question</Label>
+              <Label htmlFor="pollQuestion" className="text-foreground">
+                Question
+              </Label>
               <Input
                 id="pollQuestion"
                 value={pollQuestion}
@@ -638,7 +763,9 @@ export default function ChatPage() {
                   {pollOptions.length > 2 && (
                     <Button
                       variant="ghost"
-                      onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                      onClick={() =>
+                        setPollOptions(pollOptions.filter((_, i) => i !== idx))
+                      }
                       className="text-destructive hover:bg-destructive/10 p-2"
                     >
                       <X className="h-4 w-4" />
@@ -655,7 +782,9 @@ export default function ChatPage() {
               </Button>
             </div>
             <div className="flex items-center justify-between">
-              <Label htmlFor="allowMultiple" className="text-foreground">Allow multiple answers</Label>
+              <Label htmlFor="allowMultiple" className="text-foreground">
+                Allow multiple answers
+              </Label>
               <Switch
                 id="allowMultiple"
                 checked={allowMultiple}

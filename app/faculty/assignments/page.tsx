@@ -46,6 +46,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { set } from "date-fns";
+import { create } from "domain";
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
@@ -407,6 +408,43 @@ export default function FacultyAssignmentsPage() {
     }
   };
 
+  const createAssignmetNotification = async (
+    userIds: string[],
+    title: string,
+    dueDate: string
+  ) => {
+    try {
+      const notificationData = {
+        userIds,
+        title: `New Assignment: ${title}`,
+        description: `You have a new assignment due on ${dueDate}. Please check the assignments page for details.`,
+        type: "assignment",
+        sentBy: user?.id,
+        date: dueDate,
+      };
+
+      const response = await fetch(
+        "/api/notifications/appNotifications/createNotification",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(notificationData),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to create assignment notification");
+      }
+
+      const result = await response.json();
+      console.log("Notification created successfully:", result);
+    } catch (error) {
+      console.error("Error creating assignment notification:", error);
+    }
+  };
+
   const addAssignmentInSchedule = async (
     courseId: string,
     batchId: string,
@@ -460,6 +498,7 @@ export default function FacultyAssignmentsPage() {
         console.error("Failed to create schedule:", result.error);
         return;
       }
+      createAssignmetNotification(userIds, title, dueDate);
 
       console.log("Schedule created with ID:", result.id);
     } catch (err) {
@@ -1013,8 +1052,8 @@ export default function FacultyAssignmentsPage() {
                     {isUploading
                       ? "Uploading..."
                       : editAssignment
-                      ? "Update Assignment"
-                      : "Create Assignment"}
+                        ? "Update Assignment"
+                        : "Create Assignment"}
                   </Button>
                 </div>
               </DialogContent>

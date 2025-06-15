@@ -27,9 +27,9 @@ export default function Navbar() {
   const pathname = usePathname();
 
   const navItems = [
-    { name: "Home", href: "/student/home", icon: Home },
-    { name: "Chat", href: "/student/chat", icon: MessageSquare },
-    { name: "Schedule", href: "/student/schedule", icon: Calendar },
+    { name: "Home", href: "/alumni/home", icon: Home },
+    { name: "Chat", href: "/alumni/chat", icon: MessageSquare },
+    { name: "Schedule", href: "/alumni/schedule", icon: Calendar },
   ];
 
   return (
@@ -39,14 +39,16 @@ export default function Navbar() {
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center space-x-4">
             {navItems.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const isActive =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link key={item.name} href={item.href}>
                   <Button
                     variant="ghost"
                     className={cn(
                       "text-foreground hover:bg-primary/10 hover:text-primary transition-all duration-300 flex items-center gap-2",
-                      isActive && "bg-primary/20 text-primary shadow-md border-primary"
+                      isActive &&
+                        "bg-primary/20 text-primary shadow-md border-primary"
                     )}
                   >
                     <item.icon className="h-5 w-5" />
@@ -81,7 +83,9 @@ export default function Navbar() {
                 align="end"
               >
                 {navItems.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  const isActive =
+                    pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
                   return (
                     <DropdownMenuItem key={item.name} asChild>
                       <Link

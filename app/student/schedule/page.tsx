@@ -788,7 +788,7 @@ export default function SchedulePage() {
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
                 <SelectContent>
-                  {studentSubjects.map((subject) => (
+                  {studentSubjects?.map((subject) => (
                     <SelectItem key={subject.id} value={subject.id}>
                       {subject.name}
                     </SelectItem>

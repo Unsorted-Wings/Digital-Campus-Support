@@ -21,6 +21,7 @@ export default function FacultyHomePage() {
     subjects?: string[];
   } | null>(null);
   const [filteredEvents, setFilteredEvents] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const subjects = ["Algebra", "Calculus", "Mechanics"];
   const router = useRouter();
 
@@ -38,9 +39,24 @@ export default function FacultyHomePage() {
     }
   };
 
+  const fetchNotifications = async () => {
+    try {
+      const response = await fetch(
+        `/api/notifications/appNotifications/viewNotification?userId=${profile?.id}`
+      );
+      const data = await response.json();
+      console.log("Notifications Data:", data);
+
+      setNotifications(data.notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  };
+
   useEffect(() => {
     if (profile) {
       fetchTodaySchedule();
+      fetchNotifications();
     }
   }, [profile]);
 
@@ -71,15 +87,15 @@ export default function FacultyHomePage() {
     location: event.location || "", // fallback to empty if not present
   }));
 
-  const notifications = [
-    {
-      title: "Grade Math Assignment",
-      due: "Tomorrow, 11:59 PM",
-      type: "urgent",
-    },
-    { title: "New Physics Lab Submissions", due: "Next Week", type: "info" },
-    { title: "CS Project Review", due: "Apr 15, 2025", type: "warning" },
-  ];
+  // const notifications = [
+  //   {
+  //     title: "Grade Math Assignment",
+  //     due: "Tomorrow, 11:59 PM",
+  //     type: "urgent",
+  //   },
+  //   { title: "New Physics Lab Submissions", due: "Next Week", type: "info" },
+  //   { title: "CS Project Review", due: "Apr 15, 2025", type: "warning" },
+  // ];
 
   const logOutClickHandler = async () => {
     try {
@@ -204,39 +220,40 @@ export default function FacultyHomePage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4 space-y-4">
-          {notifications.length > 0 ? (
-            notifications.map((item, index) => (
+          {notifications?.length > 0 ? (
+            notifications?.map((item, index) => (
               <div
                 key={index}
                 className={cn(
                   "relative flex items-center gap-3 p-3 rounded-lg bg-card shadow-sm hover:bg-card/90 transition-all duration-300 overflow-hidden",
-                  item.type === "urgent" && "border-l-4 border-destructive",
-                  item.type === "warning" && "border-l-4 border-yellow-500",
-                  item.type === "info" && "border-l-4 border-primary"
+                  item?.type === "assignment" &&
+                    "border-l-4 border-destructive",
+                  item?.type === "notes" && "border-l-4 border-yellow-500",
+                  item?.type === "chat" && "border-l-4 border-primary"
                 )}
               >
                 <div
                   className={cn(
                     "absolute inset-0 bg-gradient-to-r opacity-30 group-hover:opacity-40 transition-opacity duration-300",
-                    item.type === "urgent" &&
+                    item.type === "assignment" &&
                       "from-destructive/20 to-transparent",
-                    item.type === "warning" &&
+                    item.type === "notes" &&
                       "from-yellow-500/20 to-secondary/15",
-                    item.type === "info" && "from-primary/20 to-secondary/15"
+                    item.type === "chat" && "from-primary/20 to-secondary/15"
                   )}
                 />
                 <div className="relative flex-1">
                   <p className="text-foreground font-medium text-sm">
                     {item.title}
                   </p>
-                  <p className="text-xs text-muted-foreground">{item.due}</p>
+                  <p className="text-xs text-muted-foreground">{item.date}</p>
                 </div>
                 <div
                   className={cn(
                     "relative w-2 h-2 rounded-full",
-                    item.type === "urgent" && "bg-destructive",
-                    item.type === "warning" && "bg-yellow-500",
-                    item.type === "info" && "bg-primary"
+                    item.type === "assignment" && "bg-destructive",
+                    item.type === "notes" && "bg-yellow-500",
+                    item.type === "chat" && "bg-primary"
                   )}
                 />
               </div>

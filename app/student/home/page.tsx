@@ -17,6 +17,7 @@ export default function HomePage() {
   const [user, setUser] = useState<any>(null);
   const [studentData, setStudentData] = useState<any>(null);
   const [filteredEvents, setFilteredEvents] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const fetchStudentData = async () => {
     try {
       const response = await fetch(
@@ -43,6 +44,20 @@ export default function HomePage() {
     }
   };
 
+  const fetchNotifications = async () => {
+    try {
+      const response = await fetch(
+        `/api/notifications/appNotifications/viewNotification?userId=${user?.uid}`
+      );
+      const data = await response.json();
+      console.log("Notifications Data:", data);
+
+      setNotifications(data.notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  };
+
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -54,6 +69,7 @@ export default function HomePage() {
     if (user) {
       fetchStudentData();
       fetchStudentSchedule();
+      fetchNotifications();
     }
   }, [user]);
 
@@ -76,24 +92,11 @@ export default function HomePage() {
     courseName: studentData?.courseName || "",
   };
 
-  // const schedule = [
-  //   { time: "09:00 AM", event: "Mathematics Lecture", location: "Room 101" },
-  //   { time: "11:00 AM", event: "Physics Lab", location: "Lab B" },
-  //   { time: "02:00 PM", event: "Group Study", location: "Library" },
-  //   { time: "04:00 PM", event: "CS Seminar", location: "Auditorium" },
-  // ];
-
   const schedule = filteredEvents.map((event) => ({
     time: format(parseISO(event.start), "hh:mm a"),
     event: event.title,
     location: event.location || "", // fallback to empty if not present
   }));
-
-  const notifications = [
-    { title: "Assignment Due", due: "Tomorrow, 11:59 PM", type: "urgent" },
-    { title: "Exam Schedule Released", due: "Next Week", type: "info" },
-    { title: "Project Submission", due: "Apr 10, 2025", type: "warning" },
-  ];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[1fr_2.5fr_1fr] gap-6">
@@ -192,7 +195,7 @@ export default function HomePage() {
       </Card>
 
       {/* Column 3: Notifications */}
-      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl h-[calc(100vh-5rem)] overflow-y-auto relative overflow-hidden">
+      <Card className="bg-card/95 backdrop-blur-md shadow-lg rounded-xl h-[calc(100vh-5rem)] overflow-y-auto">
         <CardHeader className="border-b border-border sticky top-0 bg-card/95 z-10">
           <CardTitle className="text-xl font-semibold text-foreground flex items-center gap-2">
             <Bell className="h-5 w-5 text-primary" />
@@ -200,39 +203,40 @@ export default function HomePage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4 space-y-4">
-          {notifications.length > 0 ? (
-            notifications.map((item, index) => (
+          {notifications?.length > 0 ? (
+            notifications?.map((item, index) => (
               <div
                 key={index}
                 className={cn(
                   "relative flex items-center gap-3 p-3 rounded-lg bg-card shadow-sm hover:bg-card/90 transition-all duration-300 overflow-hidden",
-                  item.type === "urgent" && "border-l-4 border-destructive",
-                  item.type === "warning" && "border-l-4 border-yellow-500",
-                  item.type === "info" && "border-l-4 border-primary"
+                  item?.type === "assignment" &&
+                    "border-l-4 border-destructive",
+                  item?.type === "notes" && "border-l-4 border-yellow-500",
+                  item?.type === "chat" && "border-l-4 border-primary"
                 )}
               >
                 <div
                   className={cn(
-                    "absolute inset-0 bg-gradient-to-r opacity-30 group-hover:opacity-40 transition-opacity duration-300 pointer-events-none",
-                    item.type === "urgent" &&
+                    "absolute inset-0 bg-gradient-to-r opacity-30 group-hover:opacity-40 transition-opacity duration-300",
+                    item.type === "assignment" &&
                       "from-destructive/20 to-transparent",
-                    item.type === "warning" &&
+                    item.type === "notes" &&
                       "from-yellow-500/20 to-secondary/15",
-                    item.type === "info" && "from-primary/20 to-secondary/15"
+                    item.type === "chat" && "from-primary/20 to-secondary/15"
                   )}
                 />
                 <div className="relative flex-1">
                   <p className="text-foreground font-medium text-sm">
                     {item.title}
                   </p>
-                  <p className="text-xs text-muted-foreground">{item.due}</p>
+                  <p className="text-xs text-muted-foreground">{item.date}</p>
                 </div>
                 <div
                   className={cn(
                     "relative w-2 h-2 rounded-full",
-                    item.type === "urgent" && "bg-destructive",
-                    item.type === "warning" && "bg-yellow-500",
-                    item.type === "info" && "bg-primary"
+                    item.type === "assignment" && "bg-destructive",
+                    item.type === "notes" && "bg-yellow-500",
+                    item.type === "chat" && "bg-primary"
                   )}
                 />
               </div>
