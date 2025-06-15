@@ -596,9 +596,9 @@ export default function ChatPage() {
                 >
                   Toggle Typing
                 </Button>
-              </div> : "You cannot send message to this group"}
+              </div> : <div className="w-full text-center text-muted-foreground">You cannot send message to this group</div>}
           </CardContent>
-        </Card>
+        </Card> 
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
           Select a chat to start messaging

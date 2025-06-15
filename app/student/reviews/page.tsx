@@ -522,7 +522,7 @@ export default function StudentFacultyReviewPage() {
                   <div className="flex gap-4">
                     <Button
                       onClick={handleSubmit}
-                      className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full shadow-md hover:shadow-lg transition-all duration-300"
+                      className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
                       aria-label="Submit review"
                     >
                       Submit Review
@@ -530,7 +530,7 @@ export default function StudentFacultyReviewPage() {
                     <Button
                       onClick={handleClear}
                       variant="outline"
-                      className="flex-1 bg-primary/10 border-border text-foreground hover:bg-primary/20 rounded-full"
+                      className="flex-1 bg-primary/10 border-border text-foreground hover:bg-primary/20 rounded-lg"
                       aria-label="Clear form"
                     >
                       Clear
