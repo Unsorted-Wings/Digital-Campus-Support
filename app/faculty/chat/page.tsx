@@ -495,7 +495,7 @@ export default function ChatPage() {
                           className={cn(
                             "max-w-[70%] p-3 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md",
                             msg.isSent
-                              ? "bg-gradient-to-r from-primary/80 to-primary/60 text-primary-foreground rounded-tr-none"
+                              ? "bg-gradient-to-r from-primary/10 to-secondary/10 text-foreground rounded-tr-none"
                               : "bg-muted/70 text-foreground rounded-tl-none"
                           )}
                         >

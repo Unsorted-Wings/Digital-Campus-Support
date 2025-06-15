@@ -506,7 +506,7 @@ export default function AssignmentSubmissionPage() {
                             <div className="flex gap-2 justify-center items-center">
                               <Button
                                 variant="outline"
-                                className="bg-primary/10 text-foreground hover:bg-primary/20 p-2 rounded-full"
+                                className=" text-foreground hover:bg-primary/20 p-2 rounded-lg"
                                 onClick={() => handleViewDocument(assignment.assignmentDocUrl ?? null)}
                                 disabled={!assignment.assignmentDocUrl}
                                 aria-label={`View assignment document: ${assignment.title}`}

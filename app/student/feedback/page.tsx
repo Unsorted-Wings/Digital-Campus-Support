@@ -56,7 +56,7 @@ interface Review {
   createdAt?: string;
 }
 
-export default function StudentFacultyReviewPage() {
+export default function StudentFacultyFeedbackPage() {
   const [user, setUser] = useState<any>(null);
   const [studentCourseData, setStudentCourseData] = useState<any>(null);
   const [selectedFaculty, setSelectedFaculty] = useState<string>("");
@@ -232,8 +232,8 @@ export default function StudentFacultyReviewPage() {
       setReviews((prev) => [...prev, reviewData]);
 
       toast({
-        title: "Review Submitted",
-        description: "Your faculty review has been recorded.",
+        title: "Feedback Submitted",
+        description: "Your faculty feedback has been recorded.",
       });
     } catch (err: any) {
       setError(err.message);
@@ -268,7 +268,7 @@ export default function StudentFacultyReviewPage() {
     const duplicate = checkDuplicateReview();
     if (duplicate) {
       setError(
-        "You have already submitted a review for this faculty, course, and subject."
+        "You have already submitted a feedback for this faculty, course, and subject."
       );
       return;
     }
@@ -288,8 +288,8 @@ export default function StudentFacultyReviewPage() {
     sendDataToServer(dataToSend);
 
     toast({
-      title: "Review Submitted",
-      description: "Your faculty review has been recorded.",
+      title: "Feedback Submitted",
+      description: "Your faculty feedback has been recorded.",
     });
     setSelectedFaculty("");
     setSelectedCourse("");
@@ -387,7 +387,7 @@ export default function StudentFacultyReviewPage() {
             <ScrollArea className="h-full w-full">
               <Card className="bg-muted/50 p-6 rounded-lg w-full max-w-lg mx-auto min-h-fit">
                 <h3 className="text-lg font-semibold text-foreground mb-4">
-                  Submit Faculty Review
+                  Submit Faculty Feedback
                 </h3>
                 {error && (
                   <p className="text-destructive text-sm mb-4 bg-destructive/10 p-2 rounded shadow-sm">
@@ -523,9 +523,9 @@ export default function StudentFacultyReviewPage() {
                     <Button
                       onClick={handleSubmit}
                       className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-                      aria-label="Submit review"
+                      aria-label="Submit Feedback"
                     >
-                      Submit Review
+                      Submit Feedback
                     </Button>
                     <Button
                       onClick={handleClear}
@@ -556,7 +556,7 @@ export default function StudentFacultyReviewPage() {
                   variant="outline"
                   className="w-full bg-primary/10 text-foreground hover:bg-primary/20 rounded-lg flex items-center justify-between"
                 >
-                  <span>Past Reviews ({reviews.length})</span>
+                  <span>Past Feedbacks ({reviews.length})</span>
                   {isReviewsOpen ? (
                     <ChevronUp className="h-5 w-5" />
                   ) : (
@@ -663,7 +663,7 @@ export default function StudentFacultyReviewPage() {
                   ))
                 ) : (
                   <p className="text-center text-muted-foreground py-4">
-                    No reviews submitted yet.
+                    No Feedbacks submitted yet.
                   </p>
                 )}
               </CollapsibleContent>

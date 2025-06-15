@@ -44,7 +44,7 @@ interface Course {
   subjects: Subject[];
 }
 
-export default function FacultyReviewsPage() {
+export default function FacultyFeedbackPage() {
   const [courses, setCourses] = useState<Course[]>([]);
 
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
@@ -158,12 +158,11 @@ export default function FacultyReviewsPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch reviews");
+        throw new Error(data.error || "Failed to fetch feedbacks");
       }
-      console.log("Fetched reviews:", data);
       setReviews(data.reviews);
     } catch (error) {
-      console.error("Error fetching reviews:", error);
+      console.error("Error fetching feedbacks:", error);
     }
   };
 
@@ -322,7 +321,7 @@ export default function FacultyReviewsPage() {
         <CardHeader className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
           <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />
-            Student Reviews
+            Faculty's Feedback
           </CardTitle>
           <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-full shadow-sm">
             {/* Placeholder for future actions */}
@@ -408,7 +407,7 @@ export default function FacultyReviewsPage() {
             {/* Aggregate Data */}
             <Card className="bg-muted/50 p-4 mb-6 rounded-lg">
               <h3 className="text-lg font-semibold text-foreground mb-4">
-                Aggregate Review Data
+                Aggregate Feedback Data
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div className="flex flex-col items-start gap-1 p-2 rounded-md hover:bg-primary/10 transition-all duration-300">
@@ -505,7 +504,7 @@ export default function FacultyReviewsPage() {
                         colSpan={7}
                         className="text-center text-muted-foreground"
                       >
-                        No reviews available.
+                        No feedbacks available.
                       </TableCell>
                     </TableRow>
                   )}
