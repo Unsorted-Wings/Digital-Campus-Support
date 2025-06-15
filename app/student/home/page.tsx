@@ -10,6 +10,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import { format, parseISO } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 
 export default function HomePage() {
   const router = useRouter();
@@ -18,6 +29,52 @@ export default function HomePage() {
   const [studentData, setStudentData] = useState<any>(null);
   const [filteredEvents, setFilteredEvents] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+
+  const handleChangePassword = async () => {
+    setPasswordError("");
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/users/updateUser/changePassword", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          uid: user.uid, // Replace with actual logged-in user's ID
+          oldPassword: passwordForm.oldPassword,
+          newPassword: passwordForm.newPassword,
+          confirmPassword: passwordForm.confirmPassword,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setPasswordError(data.error || "Failed to update password");
+      } else {
+        toast({
+          title: "Password changes Submitted",
+          description: "Your password has changed .",
+        });
+        setShowChangePassword(false);
+      }
+    } catch (error) {
+      setPasswordError("An unexpected error occurred");
+    }
+  };
   const fetchStudentData = async () => {
     try {
       const response = await fetch(
@@ -133,6 +190,7 @@ export default function HomePage() {
             <Button
               variant="outline"
               className="w-full bg-primary/10 border-border text-foreground hover:bg-primary/20 hover:shadow-lg rounded-lg transition-all duration-300"
+              onClick={() => setShowChangePassword(true)}
             >
               Change Password
             </Button>
@@ -146,6 +204,91 @@ export default function HomePage() {
           </div>
         </CardContent>
         <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-20 pointer-events-none" />
+        <Dialog open={showChangePassword} onOpenChange={setShowChangePassword}>
+          <DialogContent className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">
+                Change Password
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground text-sm">
+                Enter your current password and the new password you'd like to
+                use.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 p-4">
+              {passwordError && (
+                <p className="text-destructive text-sm">{passwordError}</p>
+              )}
+
+              <div>
+                <Label htmlFor="oldPassword" className="text-foreground">
+                  Old Password
+                </Label>
+                <Input
+                  id="oldPassword"
+                  type="password"
+                  value={passwordForm.oldPassword}
+                  onChange={(e) =>
+                    setPasswordForm({
+                      ...passwordForm,
+                      oldPassword: e.target.value,
+                    })
+                  }
+                  placeholder="Enter current password"
+                  className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="newPassword" className="text-foreground">
+                  New Password
+                </Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) =>
+                    setPasswordForm({
+                      ...passwordForm,
+                      newPassword: e.target.value,
+                    })
+                  }
+                  placeholder="Enter new password"
+                  className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="confirmPassword" className="text-foreground">
+                  Confirm New Password
+                </Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordForm({
+                      ...passwordForm,
+                      confirmPassword: e.target.value,
+                    })
+                  }
+                  placeholder="Confirm new password"
+                  className="bg-muted/50 border-border focus:ring-primary focus:border-primary rounded-lg"
+                />
+              </div>
+
+              <DialogFooter className="flex justify-center">
+                <Button
+                  onClick={handleChangePassword}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 mx-auto"
+                >
+                  Update Password
+                </Button>
+              </DialogFooter>
+            </div>
+          </DialogContent>
+        </Dialog>
       </Card>
 
       {/* Column 2: Schedule */}

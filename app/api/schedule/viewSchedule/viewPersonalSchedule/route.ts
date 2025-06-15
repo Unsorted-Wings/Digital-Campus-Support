@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     const filteredEvents = snapshot.docs
       .map((doc) => doc.data())
       .filter((event) => Array.isArray(event.userIds) && event.userIds.includes(userId));
+      console.log("Filtered Events:", filteredEvents);
 
     return NextResponse.json(filteredEvents, { status: 200 });
   } catch (err: any) {

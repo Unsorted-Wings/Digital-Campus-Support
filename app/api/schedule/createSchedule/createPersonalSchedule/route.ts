@@ -27,10 +27,11 @@ export async function POST(req: NextRequest) {
     // 4️⃣ Prepare event object
     const id = firestore.collection("calendarEvents").doc().id;
     const now = new Date().toISOString();
+    const userIds = Array.isArray(token.id) ? token.id : [token.id]; // Ensure userIds is an array
 
     const event = {
       id,
-      userIds: token.id, // user ID from NextAuth token
+      userIds: userIds, // user ID from NextAuth token
       title,
       description: description || "",
       start,

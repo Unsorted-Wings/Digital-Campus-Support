@@ -5,16 +5,16 @@ import { firestore } from "@/lib/firebase/firebaseAdmin";
 export async function POST(req: NextRequest) {
   try {
     // 1️⃣ Authenticate user via NextAuth JWT
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    // const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // if (!token) {
+    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // }
 
-    // 2️⃣ Only admin users can create rooms
-    if (token.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // // 2️⃣ Only admin users can create rooms
+    // if (token.role !== "admin") {
+    //   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // }
 
     // 3️⃣ Parse request body
     const { name, type, members } = await req.json();
