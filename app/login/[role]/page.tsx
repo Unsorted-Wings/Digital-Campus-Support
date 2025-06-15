@@ -51,17 +51,13 @@ export default function RoleLoginPage({
       if (params.role === "alumni" && user.isAlumni === true) {
         localStorage.setItem("user", JSON.stringify(user));
         router.push(`/${params.role}/home`);
-      } 
-      else if (!user || user.role !== params.role) {
+      } else if (!user || user.role !== params.role) {
         setError("Access denied.");
 
         return;
       }
 
-      if (params.role === "alumni" && user.isAlumni === true) {
-        localStorage.setItem("user", JSON.stringify(user));
-        router.push(`/${params.role}/home`);
-      }
+  
 
       // Step 4: Store user data in localStorage
       localStorage.setItem("user", JSON.stringify(user));

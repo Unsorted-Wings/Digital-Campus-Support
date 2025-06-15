@@ -35,9 +35,10 @@ export async function GET(req: NextRequest) {
       .doc(userDoc.id)
       .get();
     if (studentDoc.exists) {
-      courseId = studentDoc.data()?.courseId ?? null;
+      courseId = studentDoc.data()?.courseId;
       isAlumni = studentDoc.data()?.isAlumni || false;
     }
+
   }
 
   if (user.role === "faculty") {
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
     email: user.email,
     name: user.name,
     role: user.role,
-    ...(user.role === "student" && { courseId } && { isAlumni }),
+    ...(user.role === "student" && { courseId, isAlumni }),
     ...(user.role === "faculty" && { subjects: user.subjects || [] }),
   });
 }
