@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2️⃣ Only admin users can create calendar events
-    if (token.role !== "admin") {
+    if (token.role !== "admin" && token.role !== "faculty") {
       return NextResponse.json(
         { error: "Only admin can create calendar events" },
         { status: 403 }
