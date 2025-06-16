@@ -413,7 +413,7 @@ export default function ChatPage() {
                   {room.name.charAt(0)}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 max-w-[220px]">
                 <p className="text-foreground font-medium truncate">
                   {room.name}
                 </p>

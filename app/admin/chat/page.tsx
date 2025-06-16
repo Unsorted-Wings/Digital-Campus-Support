@@ -299,7 +299,7 @@ export default function ChatPage() {
                   {chat.name.charAt(0)}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 max-w-[220px]">
                 <p className="text-foreground font-medium truncate">{chat.name}</p>
                 <p className="text-xs text-muted-foreground truncate">{chat.lastMessage}</p>
               </div>
