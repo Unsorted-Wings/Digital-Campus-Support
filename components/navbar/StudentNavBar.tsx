@@ -34,7 +34,7 @@ export default function Navbar() {
     { name: "Schedule", href: "/student/schedule", icon: Calendar },
     { name: "Assignment Submission", href: "/student/assignments", icon: Upload },
     { name: "Doc Repo", href: "/student/docs", icon: Folder },
-    { name: "Reviews", href: "/student/reviews", icon: CheckSquare },
+    { name: "Feedback", href: "/student/feedback", icon: CheckSquare },
   ];
 
   return (

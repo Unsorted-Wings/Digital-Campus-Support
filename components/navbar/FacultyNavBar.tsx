@@ -33,7 +33,7 @@ export default function FacultyNavBar() {
     { name: "Schedule", href: "/faculty/schedule", icon: Calendar },
     { name: "Assignment Submission", href: "/faculty/assignments", icon: Upload },
     { name: "Doc Repo", href: "/faculty/docs", icon: Folder },
-    { name: "Reviews", href: "/faculty/reviews", icon: CheckSquare },
+    { name: "Feedback", href: "/faculty/feedback", icon: CheckSquare },
   ];
 
   return (

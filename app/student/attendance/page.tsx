@@ -12,9 +12,38 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { UserCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export default function AttendancePage() {
   // Mock data (replace with real data from backend)
+  const [user, setUser] = useState<any>(null);
+  const [studentAttendanceData, setStudentAttendanceData] = useState<any>(null);
+
+  const fetchStudentAttendanceData = async () => {
+    try {
+      const response = await fetch(
+        `/api/attendance/viewAttendance?studentId=${user.uid}`
+      );
+      const data = await response.json();
+      setStudentAttendanceData(data);
+    } catch (error) {
+      console.error("Error fetching student attendance data:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchStudentAttendanceData();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
   const attendanceData = {
     aggregate: {
       attended: 85,
@@ -37,16 +66,34 @@ export default function AttendancePage() {
     return "text-red-500";
   };
 
-  const aggregatePercentage = calculatePercentage(attendanceData.aggregate.attended, attendanceData.aggregate.total);
+  const aggregatePercentage = calculatePercentage(
+    attendanceData.aggregate.attended,
+    attendanceData.aggregate.total
+  );
+
+  const subjects = studentAttendanceData?.[0]?.subjects || [];
+
+  const totalLectures = subjects.reduce(
+    (sum: number, subj: any) => sum + subj.totalLectures,
+    0
+  );
+  const attendedLectures = subjects.reduce(
+    (sum: number, subj: any) => sum + subj.attendedLecures,
+    0
+  );
+  const attendancePercentage = (
+    (attendedLectures / totalLectures) *
+    100
+  ).toFixed(2);
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
       {/* Header */}
-      <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden">
+       <Card className="bg-card/95 backdrop-blur-md shadow-xl rounded-xl relative overflow-hidden mt-4 min-h-[60px]">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-20 pointer-events-none" />
-        <CardHeader className="p-4 flex justify-between relative z-10">
-          <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <UserCheck className="h-6 w-6 text-primary" />
+        <CardHeader className="px-6 py-5 flex  gap-3 relative z-10">
+          <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-3">
+            <UserCheck className="h-7 w-7 text-primary" />
             Attendance
           </CardTitle>
         </CardHeader>
@@ -64,11 +111,16 @@ export default function AttendancePage() {
           </CardHeader>
           <CardContent className="p-6 flex items-center justify-center relative z-10">
             <div className="text-center">
-              <p className={cn("text-5xl font-bold", getAttendanceColor(parseFloat(aggregatePercentage)))}>
-                {aggregatePercentage}%
+              <p
+                className={cn(
+                  "text-5xl font-bold",
+                  getAttendanceColor(parseFloat(attendancePercentage))
+                )}
+              >
+                {attendancePercentage}%
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                {attendanceData.aggregate.attended} / {attendanceData.aggregate.total} classes
+                {attendedLectures} / {totalLectures} classes
               </p>
             </div>
           </CardContent>
@@ -89,33 +141,48 @@ export default function AttendancePage() {
                   <TableRow className="bg-muted/50">
                     <TableHead className="text-foreground">Subject</TableHead>
                     <TableHead className="text-foreground">Attended</TableHead>
-                    <TableHead className="text-foreground">Total Classes</TableHead>
-                    <TableHead className="text-foreground">Percentage</TableHead>
+                    <TableHead className="text-foreground">
+                      Total Classes
+                    </TableHead>
+                    <TableHead className="text-foreground">
+                      Percentage
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {attendanceData.subjects.map((subject, idx) => {
-                    const percentage = calculatePercentage(subject.attended, subject.total);
-                    return (
-                      <TableRow
-                        key={idx}
-                        className="hover:bg-primary/5 transition-all duration-300"
-                      >
-                        <TableCell className="font-medium text-foreground">
-                          {subject.name}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {subject.attended}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {subject.total}
-                        </TableCell>
-                        <TableCell className={cn("font-medium", getAttendanceColor(parseFloat(percentage)))}>
-                          {percentage}%
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {studentAttendanceData?.[0]?.subjects?.map(
+                    (subject: any, idx: number) => {
+                      const percentage = calculatePercentage(
+                        subject.attendedLecures,
+                        subject.totalLectures
+                      );
+
+                      return (
+                        <TableRow
+                          key={idx}
+                          className="hover:bg-primary/5 transition-all duration-300"
+                        >
+                          <TableCell className="font-medium text-foreground">
+                            {subject.subject}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {subject.attendedLecures}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {subject.totalLectures}
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              "font-medium",
+                              getAttendanceColor(parseFloat(percentage))
+                            )}
+                          >
+                            {percentage}%
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                  )}
                 </TableBody>
               </Table>
             </ScrollArea>

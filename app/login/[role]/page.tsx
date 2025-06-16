@@ -9,17 +9,63 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Mail, Lock, ArrowLeft } from "lucide-react";
+import { signIn } from "next-auth/react";
+import { toast } from "@/hooks/use-toast";
+// import { collection, query, where, getDocs } from "firebase/firestore";
+// import { db } from "@/lib/firebase/firebaseConfig";
 
-export default function RoleLoginPage({ params }: { params: { role: string } }) {
+export default function RoleLoginPage({
+  params,
+}: {
+  params: { role: string };
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Add your login logic here (e.g., API call)
-    console.log(`Logging in as ${params.role}:`, { email, password });
-    router.push(`/${params.role}/home`);
+    setError(null); // Reset error before each login attempt
+
+    try {
+      // Step 1: NextAuth Authentication - Sign in the user
+      const result = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+      });
+
+      if (result?.error) {
+        setError("Invalid email or password.");
+
+        return;
+      }
+
+      // Step 2: Get user details from Firestore using their email
+
+      const userRes = await fetch("/api/users/viewUser/viewUserInfo");
+      const user = await userRes.json();
+
+      // Step 3: Check if role matches
+      if (params.role === "alumni" && user.isAlumni === true) {
+        localStorage.setItem("user", JSON.stringify(user));
+        router.push(`/${params.role}/home`);
+      } else if (!user || user.role !== params.role) {
+        setError("Access denied.");
+
+        return;
+      }
+
+  
+
+      // Step 4: Store user data in localStorage
+      localStorage.setItem("user", JSON.stringify(user));
+      router.push(`/${params.role}/home`);
+    } catch (err: any) {
+      console.error(err);
+      setError("An error occurred while logging in.");
+    }
   };
 
   const role = params.role.charAt(0).toUpperCase() + params.role.slice(1);
@@ -61,7 +107,16 @@ export default function RoleLoginPage({ params }: { params: { role: string } }) 
           </p>
         </CardHeader>
         <CardContent className="p-8">
-          <form onSubmit={handleSubmit} className="space-y-4" aria-label={`${role} login form`}>
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-4"
+            aria-label={`${role} login form`}
+          >
+            {error && (
+              <p className="text-destructive text-sm mb-4 bg-destructive/10 p-2 rounded shadow-sm">
+                {error}
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground font-medium">
                 Email
@@ -133,9 +188,15 @@ export default function RoleLoginPage({ params }: { params: { role: string } }) 
       {/* Background Elements */}
       <style jsx>{`
         @keyframes gradient-bg {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
+          0% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+          100% {
+            background-position: 0% 50%;
+          }
         }
         .animate-gradient-bg {
           background-size: 200% 200%;

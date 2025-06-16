@@ -9,63 +9,192 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { BookOpen, TrendingUp, BarChart } from "lucide-react";
-import { useState } from "react";
+import { use, useEffect, useState } from "react";
 
 export default function GradebookPage() {
   const [activeTab, setActiveTab] = useState("summary");
+  const [user, setUser] = useState<any>(null);
+  const [currentSemesterId, setCurrentSemesterId] = useState<string | null>(
+    null
+  );
+  const [studentCourseData, setStudentCourseData] = useState<any>(null);
+  const [fetchedGrades, setFetchedGrades] = useState<any>(null);
+  const [structuredGrades, setStructuredGrades] = useState<any>(null);
+  const [areTermEndMarkFetched, setAreTermEndMarksFetched] =
+    useState<boolean>(false);
+  const [overallGPA, setOverallGPA] = useState<number>(0);
 
-  // Mock data (replace with real data from backend)
-  const grades = {
-    summary: [
-      {
-        subject: "Mathematics",
-        sessional1: 85,
-        sessional2: 92,
-        termEnd: 88,
-        attendance: 4,
-        assignments: 5,
-      },
-      {
-        subject: "Physics",
-        sessional1: 78,
-        sessional2: 82,
-        termEnd: 85,
-        attendance: 5,
-        assignments: 4,
-      },
-      {
-        subject: "Computer Science",
-        sessional1: 90,
-        sessional2: 87,
-        termEnd: 91,
-        attendance: 5,
-        assignments: 5,
-      },
-    ],
+  const fetchStudentCourseDetails = async () => {
+    try {
+      const response = await fetch(
+        `/api/batch/viewBatch/viewStudentBatchDetail?studentId=${user.uid}`
+      );
+      const data = await response.json();
+      setStudentCourseData(data);
+    } catch (error) {
+      console.error("Error fetching student course details:", error);
+    }
   };
 
-  const calculateInternalMarks = (sessional1: number, sessional2: number, attendance: number, assignments: number) => {
-    const [higher, lower] = sessional1 > sessional2 ? [sessional1, sessional2] : [sessional2, sessional1];
-    const examComponent = ((0.7 * higher + 0.3 * lower) / 100) * 15; // 15 marks total for exams
+  const fetchStudentCurrentSemester = async () => {
+    try {
+      const res = await fetch(
+        `/api/semesterDetail/viewSemesterDetail/viewStudentCurrentSemester/?courseId=${studentCourseData?.courseId}&batchId=${studentCourseData?.batchId}`,
+        {
+          method: "GET",
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch semester detail");
+      }
+      setCurrentSemesterId(data.semesterDetailId);
+    } catch (error) {
+      console.error("Error fetching semester detail:", error);
+    }
+  };
+
+  const fetchStudentGrades = async () => {
+    if (!currentSemesterId || !studentCourseData) return;
+
+    try {
+      const res = await fetch(
+        `/api/grades/viewGrades/viewStudentGrades?semesterId=${currentSemesterId}`,
+        {
+          method: "GET",
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch grades");
+      }
+
+      setFetchedGrades(data);
+    } catch (error) {
+      console.error("Error fetching grades:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchStudentCourseDetails();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && studentCourseData) {
+      fetchStudentCurrentSemester();
+    }
+  }, [user, studentCourseData]);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user && currentSemesterId && studentCourseData) {
+      fetchStudentGrades();
+    }
+  }, [user, currentSemesterId, studentCourseData]);
+
+  useEffect(() => {
+    if (!fetchedGrades) return;
+    const gradesMap = new Map();
+
+    for (const grade of fetchedGrades) {
+      const key = grade.subjectId;
+
+      if (!gradesMap.has(key)) {
+        gradesMap.set(key, {
+          subject: grade.subjectName,
+          sessional1: 0,
+          sessional2: 0,
+          // termEnd: 0,
+          attendance: 0,
+          assignments: 0,
+        });
+      }
+
+      const current = gradesMap.get(key);
+
+      if (grade.category === "internal") {
+        current.sessional1 = grade.sessional1;
+        current.sessional2 = grade.sessional2;
+        current.attendance = grade.attendance;
+        current.assignments = grade.assignments;
+      } else if (grade.category === "external") {
+        current.termEnd = grade.termEnd; // or `grade.termEnd` if stored under a different key
+        setAreTermEndMarksFetched(true);
+      }
+
+      gradesMap.set(key, current);
+    }
+
+    const grades = {
+      summary: Array.from(gradesMap.values()),
+    };
+    setStructuredGrades(grades);
+  }, [fetchedGrades]);
+
+  const calculateInternalMarks = (
+    sessional1: number,
+    sessional2: number,
+    attendance: number,
+    assignments: number
+  ) => {
+    const [higher, lower] =
+      sessional1 > sessional2
+        ? [sessional1, sessional2]
+        : [sessional2, sessional1];
+    const examComponent = ((0.7 * higher + 0.3 * lower) / 30) * 15; // 15 marks total for exams
     return examComponent + attendance + assignments; // Total internal: 30 marks
   };
 
-  const calculateFinalMarks = (sessional1: number, sessional2: number, termEnd: number, attendance: number, assignments: number) => {
-    const internalMarks = calculateInternalMarks(sessional1, sessional2, attendance, assignments);
-    const termEndComponent = (termEnd / 100) * 70; // 70% of Term End Exam
-    return internalMarks + termEndComponent; // Total: 100 marks
+  const calculateFinalMarks = (
+    sessional1: number,
+    sessional2: number,
+    termEnd: number,
+    attendance: number,
+    assignments: number,
+    areTermEndMarkFetched?: boolean
+  ) => {
+    const internalMarks = calculateInternalMarks(
+      sessional1,
+      sessional2,
+      attendance,
+      assignments
+    );
+
+    if (!areTermEndMarkFetched) {
+      return internalMarks; // Out of 30
+    }
+
+    const termEndComponent = (termEnd / 100) * 70; // 70% of Term End
+    return internalMarks + termEndComponent; // Out of 100
   };
 
   const getLetterGrade = (marks: number) => {
+    if (!areTermEndMarkFetched) {
+      // Internal marks only (out of 30)
+      if (marks >= 27) return "A+";
+      if (marks >= 25.5) return "A";
+      if (marks >= 24) return "A-";
+      if (marks >= 22.5) return "B+";
+      if (marks >= 21) return "B";
+      if (marks >= 18) return "C";
+      return "D";
+    }
+
+    // Full marks (out of 100)
     if (marks >= 90) return "A+";
     if (marks >= 85) return "A";
     if (marks >= 80) return "A-";
@@ -89,10 +218,43 @@ export default function GradebookPage() {
     }
   };
 
-  const overallGPA = grades.summary.reduce((acc, curr) => {
-    const finalMarks = calculateFinalMarks(curr.sessional1, curr.sessional2, curr.termEnd, curr.attendance, curr.assignments);
-    return acc + (finalMarks / 100) * 4; // Assuming 4.0 scale
-  }, 0) / grades.summary.length;
+  const calculateOverallGPA = () => {
+    try {
+      const summary = structuredGrades?.summary || [];
+
+      if (summary.length === 0) return 0;
+
+      const totalGPA = summary.reduce((acc: number, curr: any) => {
+        const finalMarks = calculateFinalMarks(
+          curr.sessional1,
+          curr.sessional2,
+          curr.termEnd ?? 0,
+          curr.attendance,
+          curr.assignments,
+          areTermEndMarkFetched
+        );
+
+        const gpa = areTermEndMarkFetched
+          ? (finalMarks / 100) * 10
+          : (finalMarks / 30) * 10;
+
+        return acc + gpa;
+      }, 0);
+
+      const overallGPA = totalGPA / summary.length;
+      return overallGPA;
+    } catch (error) {
+      console.error("Error calculating GPA:", error);
+      return 0;
+    }
+  };
+
+  useEffect(() => {
+    if (structuredGrades?.summary?.length > 0) {
+      const gpa = calculateOverallGPA();
+      setOverallGPA(gpa);
+    }
+  }, [structuredGrades, areTermEndMarkFetched]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] gap-6 p-6">
@@ -137,8 +299,12 @@ export default function GradebookPage() {
             <CardContent className="p-6 relative z-10">
               <div className="flex items-center justify-center mb-6">
                 <div className="text-center">
-                  <p className="text-4xl font-bold text-foreground">{overallGPA.toFixed(2)}</p>
-                  <p className="text-sm text-muted-foreground">Overall GPA (4.0 Scale)</p>
+                  <p className="text-4xl font-bold text-foreground">
+                    {overallGPA.toFixed(2)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Overall GPA (4.0 Scale)
+                  </p>
                 </div>
               </div>
               <ScrollArea className="h-[400px]">
@@ -146,14 +312,23 @@ export default function GradebookPage() {
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="text-foreground">Subject</TableHead>
-                      <TableHead className="text-foreground">Internal Marks</TableHead>
-                      <TableHead className="text-foreground">Term End</TableHead>
-                      <TableHead className="text-foreground">Final Marks</TableHead>
+                      <TableHead className="text-foreground">
+                        Internal Marks
+                      </TableHead>
+                      {areTermEndMarkFetched && (
+                        <TableHead className="text-foreground">
+                          Term End
+                        </TableHead>
+                      )}
+                      <TableHead className="text-foreground">
+                        Final Marks
+                      </TableHead>
                       <TableHead className="text-foreground">Grade</TableHead>
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
-                    {grades.summary.map((subject, idx) => {
+                    {structuredGrades?.summary.map((subject: any, idx: any) => {
                       const internalMarks = calculateInternalMarks(
                         subject.sessional1,
                         subject.sessional2,
@@ -179,13 +354,21 @@ export default function GradebookPage() {
                           <TableCell className="text-muted-foreground">
                             {internalMarks.toFixed(1)}/30
                           </TableCell>
+                          {areTermEndMarkFetched && (
+                            <TableCell className="text-muted-foreground">
+                              {subject.termEnd}/100
+                            </TableCell>
+                          )}
                           <TableCell className="text-muted-foreground">
-                            {subject.termEnd}/100
+                            {finalMarks.toFixed(1)}/
+                            {areTermEndMarkFetched ? "100" : "30"}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {finalMarks.toFixed(1)}/100
-                          </TableCell>
-                          <TableCell className={cn("font-medium", getGradeColor(letterGrade))}>
+                          <TableCell
+                            className={cn(
+                              "font-medium",
+                              getGradeColor(letterGrade)
+                            )}
+                          >
                             {letterGrade}
                           </TableCell>
                         </TableRow>
@@ -209,7 +392,7 @@ export default function GradebookPage() {
             </CardHeader>
             <CardContent className="p-6 relative z-10">
               <ScrollArea className="h-[400px]">
-                {grades.summary.map((subject, idx) => {
+                {structuredGrades?.summary?.map((subject: any, idx: any) => {
                   const internalMarks = calculateInternalMarks(
                     subject.sessional1,
                     subject.sessional2,
@@ -231,17 +414,31 @@ export default function GradebookPage() {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">
-                            <TableHead className="text-foreground">Component</TableHead>
-                            <TableHead className="text-foreground">Score</TableHead>
-                            <TableHead className="text-foreground">Max Score</TableHead>
-                            <TableHead className="text-foreground">Contribution</TableHead>
+                            <TableHead className="text-foreground">
+                              Component
+                            </TableHead>
+                            <TableHead className="text-foreground">
+                              Score
+                            </TableHead>
+                            <TableHead className="text-foreground">
+                              Max Score
+                            </TableHead>
+                            <TableHead className="text-foreground">
+                              Contribution
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           <TableRow className="hover:bg-primary/5 transition-all duration-300">
-                            <TableCell className="font-medium text-foreground">Sessional 1</TableCell>
-                            <TableCell className="text-muted-foreground">{subject.sessional1}</TableCell>
-                            <TableCell className="text-muted-foreground">100</TableCell>
+                            <TableCell className="font-medium text-foreground">
+                              Sessional 1
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {subject.sessional1}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              30
+                            </TableCell>
                             <TableCell className="text-muted-foreground">
                               {subject.sessional1 > subject.sessional2
                                 ? "70% of Internal Exam (15)"
@@ -249,9 +446,15 @@ export default function GradebookPage() {
                             </TableCell>
                           </TableRow>
                           <TableRow className="hover:bg-primary/5 transition-all duration-300">
-                            <TableCell className="font-medium text-foreground">Sessional 2</TableCell>
-                            <TableCell className="text-muted-foreground">{subject.sessional2}</TableCell>
-                            <TableCell className="text-muted-foreground">100</TableCell>
+                            <TableCell className="font-medium text-foreground">
+                              Sessional 2
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {subject.sessional2}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              30
+                            </TableCell>
                             <TableCell className="text-muted-foreground">
                               {subject.sessional2 > subject.sessional1
                                 ? "70% of Internal Exam (15)"
@@ -259,35 +462,80 @@ export default function GradebookPage() {
                             </TableCell>
                           </TableRow>
                           <TableRow className="hover:bg-primary/5 transition-all duration-300">
-                            <TableCell className="font-medium text-foreground">Attendance</TableCell>
-                            <TableCell className="text-muted-foreground">{subject.attendance}</TableCell>
-                            <TableCell className="text-muted-foreground">5</TableCell>
-                            <TableCell className="text-muted-foreground">5/30</TableCell>
+                            <TableCell className="font-medium text-foreground">
+                              Attendance
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {subject.attendance}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              5
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              5/30
+                            </TableCell>
                           </TableRow>
                           <TableRow className="hover:bg-primary/5 transition-all duration-300">
-                            <TableCell className="font-medium text-foreground">Assignments</TableCell>
-                            <TableCell className="text-muted-foreground">{subject.assignments}</TableCell>
-                            <TableCell className="text-muted-foreground">5</TableCell>
-                            <TableCell className="text-muted-foreground">5/30</TableCell>
+                            <TableCell className="font-medium text-foreground">
+                              Assignments
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {subject.assignments}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              10
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              10/30
+                            </TableCell>
                           </TableRow>
                           <TableRow className="hover:bg-primary/5 transition-all duration-300">
-                            <TableCell className="font-medium text-foreground">Internal Total</TableCell>
-                            <TableCell className="text-muted-foreground">{internalMarks.toFixed(1)}</TableCell>
-                            <TableCell className="text-muted-foreground">30</TableCell>
-                            <TableCell className="text-muted-foreground">30%</TableCell>
+                            <TableCell className="font-medium text-foreground">
+                              Internal Total
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {internalMarks.toFixed(1)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              30
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              30%
+                            </TableCell>
                           </TableRow>
-                          <TableRow className="hover:bg-primary/5 transition-all duration-300">
-                            <TableCell className="font-medium text-foreground">Term End Exam</TableCell>
-                            <TableCell className="text-muted-foreground">{subject.termEnd}</TableCell>
-                            <TableCell className="text-muted-foreground">100</TableCell>
-                            <TableCell className="text-muted-foreground">70%</TableCell>
-                          </TableRow>
-                          <TableRow className="hover:bg-primary/5 transition-all duration-300 font-semibold">
-                            <TableCell className="text-foreground">Final Total</TableCell>
-                            <TableCell className="text-foreground">{finalMarks.toFixed(1)}</TableCell>
-                            <TableCell className="text-foreground">100</TableCell>
-                            <TableCell className="text-foreground">-</TableCell>
-                          </TableRow>
+
+                          {areTermEndMarkFetched && (
+                            <>
+                              <TableRow className="hover:bg-primary/5 transition-all duration-300">
+                                <TableCell className="font-medium text-foreground">
+                                  Term End Exam
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {subject.termEnd}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  100
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  70%
+                                </TableCell>
+                              </TableRow>
+                              <TableRow className="hover:bg-primary/5 transition-all duration-300 font-semibold">
+                                <TableCell className="text-foreground">
+                                  Final Total
+                                </TableCell>
+                                <TableCell className="text-foreground">
+                                  {finalMarks.toFixed(1)}
+                                </TableCell>
+                                <TableCell className="text-foreground">
+                                  100
+                                </TableCell>
+                                <TableCell className="text-foreground">
+                                  -
+                                </TableCell>
+                              </TableRow>
+                            </>
+                          )}
                         </TableBody>
                       </Table>
                     </div>

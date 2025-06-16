@@ -7,81 +7,56 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Search, Download, Folder, Eye, FileText, FileCode, FileHeart, File, BookOpen } from "lucide-react";
-import { useState } from "react";
+import { Search, Download, Folder, Eye, FileText, FileCode, FileHeart, File, BookOpen, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 
+type Subject = {
+  id: string;
+  name: string;
+  documents: {
+    id: string; // Changed from number to string
+    title: string; // This will now be mapped from resource.name
+    type: string;
+    uploadedBy: string; // This will now be mapped from resource.createdBy
+    date: string; // This will now be mapped from resource.createdAt
+    fileUrl: string;
+    facultyName: string;
+  }[];
+};
+interface Resource {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  batchId: string;
+  subjectId?: string;
+  semesterId: string;
+  createdBy: string;
+  facultyName: string;
+  fileUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  courseName?: string; // Optional, if you want to display course name
+  subjectName?: string; // Optional, if you want to display subject name
+}
 export default function DocRepoPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSubject, setSelectedSubject] = useState<string | null>("Mathematics");
+  const [selectedSubject, setSelectedSubject] = useState<string | null>("Mathematics"); // Initial state set to "Mathematics"
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"recent" | "oldest" | "title-asc" | "title-desc">("recent");
   const [selectedDoc, setSelectedDoc] = useState<any | null>(null);
+  const [allData, setAllData] = useState<Subject[]>([]); // All fetched data
+  const [isLoading, setIsLoading] = useState(true); // Loading state for initial data fetch
 
-  // Mock data with subjects (replace with real data)
-  const subjects = [
-    {
-      name: "Mathematics",
-      documents: [
-        {
-          id: 1,
-          title: "Lecture Notes - Calculus",
-          type: "Lecture",
-          uploadedBy: "Prof. Smith",
-          date: "Apr 01, 2025",
-          fileUrl: "/docs/math-lecture.pdf",
-        },
-        {
-          id: 2,
-          title: "Practice Problems",
-          type: "Assignment",
-          uploadedBy: "Prof. Smith",
-          date: "Mar 30, 2025",
-          fileUrl: "/docs/math-problems.pdf",
-        },
-      ],
-    },
-    {
-      name: "Physics",
-      documents: [
-        {
-          id: 3,
-          title: "Lab Manual",
-          type: "Lab",
-          uploadedBy: "Prof. Jones",
-          date: "Mar 28, 2025",
-          fileUrl: "/docs/physics-lab.pdf",
-        },
-      ],
-    },
-    {
-      name: "Computer Science",
-      documents: [
-        {
-          id: 4,
-          title: "Seminar Slides",
-          type: "Seminar",
-          uploadedBy: "Prof. Lee",
-          date: "Apr 02, 2025",
-          fileUrl: "/docs/cs-seminar.pdf",
-        },
-      ],
-    },
-    {
-      name: "Admin",
-      documents: [
-        {
-          id: 5,
-          title: "Certification Guidelines",
-          type: "Admin",
-          uploadedBy: "Admin",
-          date: "Apr 03, 2025",
-          fileUrl: "/docs/cert-guidelines.pdf",
-        },
-      ],
-    },
-  ];
+  const [user, setUser] = useState<{
+    id: string;
+    name: string;
+    role: string;
+    courseId?: string;
+  } | null>(null);
 
   const documentTypes = ["Lecture", "Assignment", "Lab", "Seminar", "Admin"];
+  const [resources, setResources] = useState<Resource[]>([]);// This state is not directly used for rendering but kept for reference if needed elsewhere.
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -94,9 +69,118 @@ export default function DocRepoPage() {
     }
   };
 
-  const filteredSubjects = subjects.map((subject) => ({
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        console.log("Parsed user from localStorage:", parsed);
+        setUser({
+          id: parsed.uid,
+          name: parsed.name,
+          role: parsed.role,
+          courseId: parsed.courseId || undefined,
+        });
+      } catch (err) {
+        console.error("Error parsing user from localStorage:", err);
+      }
+    }
+  }, []);
+
+  const fetchData = async () => {
+    if (!user?.id || !user?.courseId) {
+      console.log("User data not available yet for fetching subjects and resources.");
+      return;
+    }
+
+    setIsLoading(true); // Set loading to true before starting fetches
+    try {
+      // Fetch Subjects
+      const subjectsResponse = await fetch(`/api/subjects/viewSubject/viewStudentSubjects?studentId=${user.id}`);
+      if (!subjectsResponse.ok) {
+        throw new Error(`Failed to fetch subjects: ${subjectsResponse.status}`);
+      }
+      const subjectsData = await subjectsResponse.json();
+      const fetchedSubjects: { id: string; name: string }[] = subjectsData.simplifiedSubjects || [];
+      console.log("Fetched Subjects:", fetchedSubjects);
+
+      // Fetch Resources
+      const resourcesResponse = await fetch(`/api/DocRepo/viewResource?courseId=${user.courseId}`);
+      if (!resourcesResponse.ok) {
+        throw new Error(`Failed to fetch resources: ${resourcesResponse.status}`);
+      }
+      const resourcesData = await resourcesResponse.json();
+      console.log(resourcesData)
+      const fetchedResources: Resource[] = resourcesData.map((item: any) => ({
+        id: item.id,
+        name: item.name, // This will be the document title
+        type: item.type,
+        description: item.description,
+        batchId: item.batchId,
+        subjectId: item.subjectId,
+        semesterId: item.semesterId,
+        createdBy: item.createdBy,
+        facultyName: item.facultyName,
+        fileUrl: item.fileUrl,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }));
+      setResources(fetchedResources); // Store raw resources
+
+      console.log("Fetched Resources:", fetchedResources);
+
+      // Combine subjects and resources
+      const combinedSubjects: Subject[] = fetchedSubjects.map((subject) => ({
+        ...subject,
+        documents: fetchedResources
+          .filter((resource) => resource.subjectId === subject.id)
+          .map((resource) => ({ // <--- ADD THIS .map() TRANSFORMATION
+            id: resource.id,
+            title: resource.name, // Map resource.name to title
+            type: resource.type,
+            facultyName: resource.facultyName,
+            uploadedBy: resource.createdBy, // Map resource.createdBy to uploadedBy
+            date: new Date(resource.createdAt).toLocaleDateString("en-US", { // Map resource.createdAt to date and format
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            }),
+            fileUrl: resource.fileUrl,
+          })),
+      }));
+      console.log(combinedSubjects)
+      setAllData(combinedSubjects);
+      // Set the first subject as selected by default if available
+      if (combinedSubjects.length > 0) {
+        setSelectedSubject(combinedSubjects[0].name);
+      }
+
+    } catch (error: any) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setIsLoading(false); // Set loading to false after fetches complete or on error
+    }
+  };
+
+  // Fetch data when user is available
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user]); // Depend on 'user' state
+
+  const handleViewDocument = (url: string | null | undefined) => {
+    console.log(url)
+    if (url) {
+      const googleDocsViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+      window.open(googleDocsViewerUrl, "_blank");
+    } else {
+      alert("No document URL available");
+    }
+  };
+  const filteredSubjects = allData.map((subject) => ({
     ...subject,
-    documents: subject.documents
+    documents: (subject.documents || [])
       .filter((doc) =>
         (doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           doc.uploadedBy.toLowerCase().includes(searchQuery.toLowerCase())) &&
@@ -110,10 +194,12 @@ export default function DocRepoPage() {
       ),
   }));
 
+
   const selectedSubjectData = filteredSubjects.find((s) => s.name === selectedSubject) || {
     name: "No Subject Selected",
     documents: [],
   };
+
 
   return (
     <div className="p-6">
@@ -136,29 +222,42 @@ export default function DocRepoPage() {
             </CardTitle>
           </CardHeader>
           <ScrollArea className="flex-1 p-4">
-            {filteredSubjects.map((subject) => (
-              <div
-                key={subject.name}
-                onClick={() => setSelectedSubject(subject.name)}
-                className={cn(
-                  "p-3 mb-2 rounded-lg cursor-pointer transition-all duration-300 relative overflow-hidden",
-                  selectedSubject === subject.name
-                    ? "bg-primary/20 shadow-lg border-l-4 border-primary"
-                    : "bg-card hover:bg-primary/10 hover:shadow-md"
-                )}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-20" />
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="text-foreground font-medium relative">{subject.name}</p>
-                    <p className="text-xs text-muted-foreground relative">
-                      {subject.documents.length} {subject.documents.length === 1 ? "file" : "files"}
-                    </p>
+            {/* Loading state for Subjects */}
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-full min-h-[150px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="mt-2 text-muted-foreground">Loading subjects...</p>
+              </div>
+            ) : filteredSubjects.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <Folder className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                No subjects found.
+              </div>
+            ) : (
+              filteredSubjects.map((allData) => (
+                <div
+                  key={allData.id}
+                  onClick={() => setSelectedSubject(allData.name)}
+                  className={cn(
+                    "p-3 mb-2 rounded-lg cursor-pointer transition-all duration-300 relative overflow-hidden",
+                    selectedSubject === allData.name
+                      ? "bg-primary/20 shadow-lg border-l-4 border-primary"
+                      : "bg-card hover:bg-primary/10 hover:shadow-md"
+                  )}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-20" />
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="text-foreground font-medium relative">{allData.name}</p>
+                      <p className="text-xs text-muted-foreground relative">
+                        {allData.documents.length} {allData.documents.length === 1 ? "file" : "files"}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )} {/* End of conditional rendering for subjects */}
           </ScrollArea>
         </Card>
 
@@ -172,6 +271,7 @@ export default function DocRepoPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-10 bg-primary/5 border-border focus:ring-primary focus:border-primary rounded-xl"
+                disabled={isLoading} // Disable search while loading
                 aria-label="Search documents"
               />
             </div>
@@ -179,6 +279,7 @@ export default function DocRepoPage() {
               <Select
                 value={selectedType || "all"}
                 onValueChange={(value) => setSelectedType(value === "all" ? null : value)}
+                disabled={isLoading} // Disable filter while loading
               >
                 <SelectTrigger className="w-40 bg-primary/5 border-border focus:ring-primary rounded-xl">
                   <SelectValue placeholder="Filter by type" />
@@ -192,7 +293,9 @@ export default function DocRepoPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}
+                disabled={isLoading} // Disable sort while loading
+              >
                 <SelectTrigger className="w-40 bg-primary/5 border-border focus:ring-primary rounded-xl">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
@@ -207,14 +310,20 @@ export default function DocRepoPage() {
           </CardHeader>
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-4">
-              {selectedSubjectData.documents.length > 0 ? (
+              {/* Loading state for Documents */}
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="mt-2 text-muted-foreground">Loading documents...</p>
+                </div>
+              ) : selectedSubjectData.documents.length > 0 ? (
                 selectedSubjectData.documents.map((doc) => (
                   <Card
                     key={doc.id}
                     className="bg-card shadow-sm rounded-lg transition-all duration-300 hover:shadow-md hover:-translate-y-1 relative overflow-hidden"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-30" />
-                    <CardContent className="p-4 flex items-center justify-between gap-4">
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-30 z-0" /> {/* Add z-0 here */}
+                    <CardContent className="p-4 flex items-center justify-between gap-4 relative z-10"> {/* Add relative z-10 here */}
                       <div className="flex items-center gap-3 flex-1">
                         {getTypeIcon(doc.type)}
                         <div className="space-y-2">
@@ -223,7 +332,7 @@ export default function DocRepoPage() {
                             <span className="font-medium">Type:</span> {doc.type}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            <span className="font-medium">Uploaded By:</span> {doc.uploadedBy}
+                            <span className="font-medium">Uploaded By:</span> {doc.facultyName}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             <span className="font-medium">Date:</span> {doc.date}
@@ -234,10 +343,12 @@ export default function DocRepoPage() {
                         <Button
                           variant="outline"
                           className="bg-primary/10 text-foreground hover:bg-primary/20 p-2 rounded-full"
-                          onClick={() => setSelectedDoc(doc)}
-                          aria-label={`View ${doc.title}`}
+                          onClick={() => handleViewDocument(doc.fileUrl ?? null)}
+                          disabled={!doc.fileUrl}
+                          aria-label={`View ${doc.fileUrl}`}
                         >
                           <Eye className="h-5 w-5" />
+
                         </Button>
                         <Button
                           asChild
@@ -253,7 +364,7 @@ export default function DocRepoPage() {
                     </CardContent>
                   </Card>
                 ))
-              ) : (
+              ) : ( /* End of conditional rendering for documents */
                 <div className="text-center text-muted-foreground py-8">
                   <Folder className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   {selectedSubject
@@ -283,7 +394,7 @@ export default function DocRepoPage() {
                     <span className="font-medium">Type:</span> {selectedDoc.type}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    <span className="font-medium">Uploaded By:</span> {selectedDoc.uploadedBy}
+                    <span className="font-medium">Uploaded By:</span> {selectedDoc.facultyName}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     <span className="font-medium">Date:</span> {selectedDoc.date}
