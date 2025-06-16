@@ -45,7 +45,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { set } from "date-fns";
+import { formatDate, set } from "date-fns";
 import { create } from "domain";
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -1181,7 +1181,7 @@ export default function FacultyAssignmentsPage() {
                             {assignment.title}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {new Date(assignment.dueDate).toLocaleDateString()}
+                            {formatDate(assignment.dueDate, "dd MMM, yy")}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {assignment.submissions}/{assignment.totalStudents}
@@ -1301,7 +1301,7 @@ export default function FacultyAssignmentsPage() {
                                 {submission.userName}
                               </TableCell>
                               <TableCell className="text-muted-foreground">
-                                {submission.uploadedAt}
+                                {formatDate(submission.uploadedAt,"dd MMM, yyyy")}
                               </TableCell>
                               <TableCell className="text-muted-foreground">
                                 <a
